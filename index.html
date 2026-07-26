@@ -772,19 +772,48 @@ function applyElemBias(idx,targetElem,bonusPct,type){
 }
 // Races: element=종족 오행, yearBias=연주 바이어스 확률, monthBias=월주 바이어스 확률
 const RACES={
-  human:{name:'인간',ageRatio:1,minAge:16,maxAge:45,
+  human:{name:'인간',ageRatio:1,minAge:18,maxAge:45,
     element:null,yearBias:0.25,monthBias:0.10},// 인간: 연간 오행→하위종족, 연지+월주 바이어스
-  elf:{name:'엘프',ageRatio:0.1,minAge:160,maxAge:400,
+  elf:{name:'엘프',ageRatio:0.1,minAge:180,maxAge:400,
     element:'wood',yearBias:0.35,monthBias:0.20},
-  orc:{name:'오크',ageRatio:2.0,minAge:8,maxAge:30,
+  orc:{name:'오크',ageRatio:2.0,minAge:9,maxAge:30,
     element:'fire',yearBias:0.35,monthBias:0.20},
-  ogre:{name:'오거',ageRatio:0.4,minAge:40,maxAge:150,
+  ogre:{name:'오거',ageRatio:0.4,minAge:45,maxAge:150,
     element:'earth',yearBias:0.35,monthBias:0.20},
-  dwarf:{name:'드워프',ageRatio:0.67,minAge:24,maxAge:65,
+  dwarf:{name:'드워프',ageRatio:0.67,minAge:27,maxAge:65,
     element:'metal',yearBias:0.35,monthBias:0.20},
-  darkelf:{name:'다크엘프',ageRatio:0.1,minAge:160,maxAge:400,
+  darkelf:{name:'다크엘프',ageRatio:0.1,minAge:180,maxAge:400,
     element:'water',yearBias:0.35,monthBias:0.20}
 };
+// ═══ 연령대(초년/중년/말년) 시스템 — 종족별 실나이 수명 경계 ═══
+// [초년 상한, 중년 상한] — 그 이상은 말년. 인간 하위인종(헬리아~류안)은 인간 공통.
+const AGE_STAGES={
+  human:[30,55],      // 수명 ~75
+  elf:[220,550],      // 수명 ~800
+  darkelf:[220,550],
+  dwarf:[45,95],      // 수명 ~130
+  orc:[14,28],        // 수명 ~40 (급성장·단명)
+  ogre:[60,130]       // 수명 ~180
+};
+const STAGE_KO={youth:'초년기',middle:'중년기',elder:'말년기'};
+function calcAgeStage(d){
+  const sp=(d&&d.race&&d.race!=='human'&&RACES[d.race])?d.race:'human';
+  const bd=AGE_STAGES[sp]||AGE_STAGES.human;
+  const ar=(RACES[sp]&&RACES[sp].ageRatio)||1;
+  let age=null;
+  if(d&&d.birth&&d.birth.year)age=ORVIA_YEAR-d.birth.year;
+  else if(d&&d.appAge!=null&&isFinite(d.appAge))age=Math.round(d.appAge/ar);
+  if(age==null||!isFinite(age)||age<0)return{stage:'middle',label:STAGE_KO.middle,age:null,appAge:null,unknown:true,bounds:bd,sp:sp};
+  const stage=age<bd[0]?'youth':(age<bd[1]?'middle':'elder');
+  return{stage:stage,label:STAGE_KO[stage],age:age,appAge:(d.appAge!=null?d.appAge:Math.floor(age*ar)),unknown:false,bounds:bd,sp:sp};
+}
+// 스테이지별 기본 NAI 태그 — 성인 앵커 고정 (초년기=young adult), 장수종은 말년도 노화 대신 초월적 분위기
+function ageStageDefault(sp,stage){
+  const longLived=(sp==='elf'||sp==='darkelf');
+  if(stage==='youth')return 'young adult, youthful face';
+  if(stage==='elder')return longLived?'ageless beauty, ancient aura, otherworldly elegance':'elderly, aged face, wrinkles, gray hair';
+  return 'adult, mature';
+}
 function isLeap(y){return(y%4===0&&y%100!==0)||y%400===0;}
 function dimOf(y,m){return[31,isLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1];}
 function absDay(y,m,d){
@@ -2041,6 +2070,8 @@ function renderAppearance(d){
   const race=d.race||'human';
   const arch=getAppearArchetype(d);const ap=arch.data;
   const bl=bodyLabel(bt.fat,bt.muscle);
+  const _astRow=calcAgeStage(d);
+  const _astRowV=_astRow.unknown?'미상 — 성인 기준':(_astRow.label+' · '+_astRow.age+'세'+((_astRow.appAge!=null&&_astRow.appAge!==_astRow.age)?' (외견 '+_astRow.appAge+'세)':''));
   const hStr=heightLabel(bt.height,gdr,_raceId);
   const browStr=bt.brow>=0.5?'굵은 눈썹':'가는 눈썹';
   const eyeCStr=bt.eyeC>=0.85?'도끼눈':bt.eyeC>=0.5?'올라간 눈꼬리':'내려간 눈꼬리';
@@ -2063,7 +2094,7 @@ function renderAppearance(d){
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">근육</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${musPct}%;height:100%;background:linear-gradient(90deg,#888,#d4a843);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.muscle>=0?'+':''}${bt.muscle.toFixed(2)}</span></div>`;
   h+=`</div>`;
   h+=slotRowEditor('body',sdefs['body']);
-  [{l:'키',v:hStr,k:'height'},{l:'눈꼬리',v:eyeCStr,k:'eye_shape'},{l:'눈동자 크기',v:pupilStr,k:'pupil'},{l:'눈썹 굵기',v:browStr,k:'brow'},{l:gdr==='f'?'유방 크기':'성기 크기',v:gTrait,k:'chest'}].concat(gdr==='f'?[{l:'골반/하체',v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:'pelvis'}]:[]).forEach(t=>{
+  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:'키',v:hStr,k:'height'},{l:'눈꼬리',v:eyeCStr,k:'eye_shape'},{l:'눈동자 크기',v:pupilStr,k:'pupil'},{l:'눈썹 굵기',v:browStr,k:'brow'},{l:gdr==='f'?'유방 크기':'성기 크기',v:gTrait,k:'chest'}].concat(gdr==='f'?[{l:'골반/하체',v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:'pelvis'}]:[]).forEach(t=>{
     h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
@@ -2704,6 +2735,8 @@ function slotAddr(d){
 // 외형 항목 → 슬롯 정의 (def = 원국 파생 기본값)
 function naiParts(d){
   const {raceId,bt,arch}=slotAddr(d);
+  const _ast=calcAgeStage(d);
+  const _astSp=_ast.sp;
   const ap=arch.data;
   const gdr=d.gender||'m';
   const bl=bodyLabel(bt.fat,bt.muscle);
@@ -2714,6 +2747,7 @@ function naiParts(d){
     {key:'eye_col',label:'눈동자 색',def:ap.eyeColNai},
     {key:'extra',label:'특수(귀·이빨·주근깨)',def:ap.extra||''},
     {key:'body',label:'체형',def:bl[1]},
+    {key:'age_'+_ast.stage,label:'연령대 — '+_ast.label,def:ageStageDefault(_astSp,_ast.stage)},
     {key:'height',label:'키/체구',def:''},
     {key:'eye_shape',label:'눈꼬리',def:bt.eyeC>=0.85?'sharp eyes, narrow eyes':bt.eyeC>=0.5?'upturned eyes':'droopy eyes, downturned eyes'},
     {key:'pupil',label:'눈동자 크기',def:bt.pupil>=0.5?'large eyes':'small eyes'},
@@ -3118,7 +3152,7 @@ window.showCompatSim=function(g){
 function runCompat(d,gdr){
   csCands=[];
   for(let i=0;i<3000;i++){
-    const age=16+Math.floor(Math.random()*30);
+    const age=18+Math.floor(Math.random()*28);
     const y=ORVIA_YEAR-age,mo=1+Math.floor(Math.random()*12);
     const dy=1+Math.floor(Math.random()*dimOf(y,mo)),hr=Math.floor(Math.random()*12);
     const s=calcSajuFromDate(y,mo,dy,hr,'none');// 바이어스 우회 → 60갑자 정합 보장
