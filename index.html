@@ -2843,7 +2843,8 @@ async function naiGenerate(reuseSeed){
     return;
   }
   go.disabled=true;re.disabled=true;
-  st.textContent='생성 중... (수 초~수십 초)';
+  st.textContent='생성 중...';
+  if(window.naiProgressStart)naiProgressStart();
   try{
     if(NAI_SERVER_MODE){
       const r=await fetch('/nai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -2851,7 +2852,7 @@ async function naiGenerate(reuseSeed){
       if(!r.ok||j.error){st.textContent='✖ '+(j.error||('HTTP '+r.status));}
       else{
         naiLastSeed=j.seed||0;
-        if(window.naiGalleryAdd)naiGalleryAdd(j.image,body.name,j.seed,j.saved);
+        if(window.naiGalleryAdd)naiGalleryAdd(j.image,body.name,j.seed,j.saved,body);
         naiShowResult(j.image,'저장됨: '+j.saved+'  ·  시드 '+j.seed);
         st.textContent='✓ 완료';
         re.disabled=false;
@@ -2860,7 +2861,7 @@ async function naiGenerate(reuseSeed){
       const out=await naiDirectGenerate(body,naiGetKey());
       naiLastSeed=out.seed;
       const url=URL.createObjectURL(out.blob);
-      naiGalleryAdd({blob:out.blob,url:url},body.name,out.seed,null);
+      naiGalleryAdd({blob:out.blob,url:url},body.name,out.seed,null,body);
       naiShowResult(url,'세션 갤러리 보관 (미저장)  ·  시드 '+out.seed);
       st.textContent='✓ 완료 — 파일로 남기려면 갤러리의 💾 저장';
       re.disabled=false;
@@ -2874,6 +2875,7 @@ async function naiGenerate(reuseSeed){
       st.textContent='✖ '+((e&&e.message)||e);
     }
   }
+  if(window.naiProgressStop)naiProgressStop();
   go.disabled=false;
 }
 
@@ -3270,7 +3272,18 @@ _st.textContent=`
 .ngal-t.on{border-color:var(--gold,#d4a843);}
 .ngal-t.saved{border-bottom-color:#3f7d4e;}
 .ngal-btn{padding:4px 10px;font-size:9px;background:var(--card,#1c1916);color:var(--txt,#e8e2d6);border:1px solid var(--bdr,#3a352e);border-radius:6px;cursor:pointer;}
-.ngal-btn.pri{background:var(--gold,#d4a843);color:#141210;font-weight:700;border-color:var(--gold,#d4a843);}`;
+.ngal-btn.pri{background:var(--gold,#d4a843);color:#141210;font-weight:700;border-color:var(--gold,#d4a843);}
+#nai-progress{display:none;margin-top:7px;}
+#nai-progress.on{display:block;}
+.npr-track{height:5px;background:var(--bg2,#141210);border:1px solid var(--bdr,#3a352e);border-radius:3px;overflow:hidden;position:relative;}
+.npr-fill{position:absolute;top:0;left:0;height:100%;width:38%;background:linear-gradient(90deg,transparent,var(--gold,#d4a843),transparent);animation:nprSlide 1.3s linear infinite;}
+@keyframes nprSlide{0%{left:-40%;}100%{left:105%;}}
+.npr-t{font-size:9px;color:var(--dim,#8a8478);margin-top:3px;letter-spacing:1px;}
+.ngal-prompt{margin-top:7px;background:var(--bg2,#141210);border:1px solid var(--bdr,#3a352e);border-radius:8px;padding:8px 10px;}
+.ngal-prompt-t{font-size:9px;color:var(--gold,#d4a843);font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.ngal-prompt-b{font-size:9px;color:var(--dim,#8a8478);line-height:1.5;word-break:break-all;max-height:70px;overflow-y:auto;}
+.nph-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bdr,#3a352e);font-size:9px;color:var(--txt,#e8e2d6);}
+.nph-meta{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim,#8a8478);}`;
 document.head.appendChild(_st);
 
 // ── IndexedDB (저장 폴더 핸들 보관) ──
@@ -3340,6 +3353,59 @@ window.naiDirectGenerate=async function(body,key){
 
 // ── 세션 갤러리 ──
 let naiOutputs=[],naiGalCur=-1;
+
+// ── 생성 진행 바 (NAI는 진행률 API가 없어 부정형 바 + 경과 초) ──
+let _nprTimer=null,_nprT0=0;
+function _nprEl(){
+  let el=document.getElementById('nai-progress');
+  if(!el){
+    const stEl=document.getElementById('nai-status');
+    if(!stEl)return null;
+    el=document.createElement('div');el.id='nai-progress';
+    el.innerHTML='<div class="npr-track"><div class="npr-fill"></div></div><div class="npr-t">생성 요청 전송...</div>';
+    stEl.parentNode.insertBefore(el,stEl.nextSibling);
+  }
+  return el;
+}
+window.naiProgressStart=function(){
+  const el=_nprEl();if(!el)return;
+  el.classList.add('on');_nprT0=Date.now();
+  clearInterval(_nprTimer);
+  _nprTimer=setInterval(()=>{
+    const s=Math.floor((Date.now()-_nprT0)/1000);
+    const t=el.querySelector('.npr-t');
+    if(t)t.textContent='⏱ '+s+'초 경과 — NAI 서버 생성 대기 중 (보통 5~30초)';
+  },1000);
+};
+window.naiProgressStop=function(){
+  clearInterval(_nprTimer);_nprTimer=null;
+  const el=document.getElementById('nai-progress');
+  if(el)el.classList.remove('on');
+};
+
+// ── 프롬프트 기록 (localStorage 지속 · 최대 100건) ──
+let naiPromptHist=[];
+try{naiPromptHist=JSON.parse(NAI_LS.get('gahorok_prompt_history')||'[]')||[];}catch(e){naiPromptHist=[];}
+function naiPromptRecord(meta,name,seed){
+  if(!meta)return;
+  naiPromptHist.unshift({ts:Date.now(),name:name||'char',seed:seed,
+    prompt:meta.prompt||'',negative:meta.negative||'',model:meta.model||'',
+    width:meta.width,height:meta.height,steps:meta.steps,scale:meta.scale});
+  if(naiPromptHist.length>100)naiPromptHist.length=100;
+  NAI_LS.set('gahorok_prompt_history',JSON.stringify(naiPromptHist));
+}
+window.nsCopyText=function(txt,btn){
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✓ 복사됨';setTimeout(()=>{btn.textContent=o;},1200);}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(()=>{_copyFallback(txt);done();});}
+  else{_copyFallback(txt);done();}
+};
+function _copyFallback(txt){
+  const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();
+}
+window.nsCopyGalPrompt=function(i,btn){const o=naiOutputs[i];if(o&&o.meta)nsCopyText(o.meta.prompt+(o.meta.negative?'\n\n[negative]\n'+o.meta.negative:''),btn);};
+window.nsCopyHistPrompt=function(i,btn){const h=naiPromptHist[i];if(h)nsCopyText(h.prompt+(h.negative?'\n\n[negative]\n'+h.negative:''),btn);};
+window.nsClearPromptHist=function(){naiPromptHist=[];NAI_LS.del('gahorok_prompt_history');drawSettings();};
 function dataUrlToBlob(du){
   const i=du.indexOf(',');const b=atob(du.slice(i+1));
   const u=new Uint8Array(b.length);for(let j=0;j<b.length;j++)u[j]=b.charCodeAt(j);
@@ -3349,12 +3415,13 @@ function safeName(s){return (String(s||'char').replace(/[^\w가-힣ㄱ-ㅎa-zA-Z
 function stamp(ts){const d=new Date(ts);const z=x=>String(x).padStart(2,'0');
   return d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'_'+z(d.getHours())+z(d.getMinutes())+z(d.getSeconds());}
 
-window.naiGalleryAdd=function(img,name,seed,savedPath){
+window.naiGalleryAdd=function(img,name,seed,savedPath,meta){
   let blob,url;
   if(typeof img==='string'){blob=null;url=img;}       // 서버 모드: dataURL (blob은 저장 시 변환)
   else{blob=img.blob;url=img.url;}
-  naiOutputs.push({blob:blob,url:url,name:name,seed:seed,ts:Date.now(),saved:savedPath||null});
+  naiOutputs.push({blob:blob,url:url,name:name,seed:seed,ts:Date.now(),saved:savedPath||null,meta:meta||null});
   naiGalCur=naiOutputs.length-1;
+  naiPromptRecord(meta,name,seed);
   naiGalleryRender();
 };
 function naiGalleryRender(){
@@ -3372,7 +3439,14 @@ function naiGalleryRender(){
   naiOutputs.forEach((o,i)=>{
     h+='<img class="ngal-t'+(i===naiGalCur?' on':'')+(o.saved?' saved':'')+'" src="'+o.url+'" title="시드 '+o.seed+(o.saved?' · 저장됨':'')+'" onclick="naiGalShow('+i+')">';
   });
-  box.innerHTML=h+'</div>';
+  h+='</div>';
+  const cur=naiOutputs[naiGalCur];
+  if(cur&&cur.meta){
+    h+='<div class="ngal-prompt"><div class="ngal-prompt-t"><span>📝 이 이미지의 프롬프트 · 시드 '+cur.seed+'</span>'
+      +'<button class="ngal-btn" onclick="nsCopyGalPrompt('+naiGalCur+',this)">📋 복사</button></div>'
+      +'<div class="ngal-prompt-b">'+esc(cur.meta.prompt)+'</div></div>';
+  }
+  box.innerHTML=h;
 }
 window.naiGalShow=function(i){
   const o=naiOutputs[i];if(!o)return;
@@ -3441,11 +3515,12 @@ function drawSettings(){
     h+='<div class="ns-note">이 브라우저(Safari/iPad)는 폴더 직접 지정을 지원하지 않아 💾 저장 시 <b>다운로드 폴더</b>로 저장됩니다.<br>iPad: 설정 → Safari → 다운로드 에서 저장 위치를 한 번 지정해두면 항상 그곳으로 들어갑니다.</div>';
   }
   h+='</div>';
-  // 3. 슬롯 백업
-  h+='<div class="ns-sec"><div class="ns-h">📦 프롬프트 슬롯 백업</div><div class="ns-row">'
-    +'<button class="ngal-btn" onclick="nsExportSlots()">내보내기 (JSON)</button>'
-    +'<label class="ngal-btn" style="cursor:pointer;">가져오기<input type="file" accept=".json" style="display:none;" onchange="nsImportSlots(this)"></label>'
-    +'</div><div class="ns-note">'+(NAI_SERVER_MODE?'서버 모드: slots.json 파일로 자동 저장 중.':'웹 모드: 슬롯은 이 브라우저(localStorage)에 저장됩니다. 기기를 옮길 때 내보내기/가져오기를 사용.')+'</div></div>';
+  // 3. 통합 설정 백업 (슬롯 + 생성 옵션 + 프록시)
+  h+='<div class="ns-sec"><div class="ns-h">📦 설정 내보내기 / 가져오기</div><div class="ns-row">'
+    +'<button class="ngal-btn pri" onclick="nsExportSettings()">전체 내보내기 (JSON)</button>'
+    +'<label class="ngal-btn" style="cursor:pointer;">가져오기<input type="file" accept=".json" style="display:none;" onchange="nsImportSettings(this)"></label>'
+    +'</div><div class="ns-note">포함: 외형 추출 프롬프트 슬롯 전체(공통 화풍·구도·네거티브·복장 + 인종·체형별 부위 슬롯) · 생성 옵션(해상도/모델/스텝/스케일) · 프록시 URL.<br><b>API 키는 파일에 포함되지 않습니다.</b> 구버전 슬롯 파일(slots.json)도 그대로 가져올 수 있습니다.'
+    +(NAI_SERVER_MODE?'<br>서버 모드: 가져온 슬롯은 slots.json에도 자동 반영됩니다.':'')+'</div></div>';
   // 4. 고급 (웹 모드만)
   if(!NAI_SERVER_MODE){
     h+='<div class="ns-sec"><div class="ns-h">🛠 고급 — 프록시 URL (선택)</div>'
@@ -3453,6 +3528,20 @@ function drawSettings(){
       +'<div class="ns-row"><button class="ngal-btn" onclick="nsApplyProxy()">적용</button></div>'
       +'<div class="ns-note">직통 호출이 CORS로 차단되는 환경에서만 사용. 배포 README에 Cloudflare Worker 프록시 만드는 법이 있습니다.</div></div>';
   }
+  // 5. 프롬프트 기록
+  h+='<div class="ns-sec"><div class="ns-h">🗂 프롬프트 기록 <span style="color:var(--dim);font-weight:400;">'+naiPromptHist.length+'건 (최근 100건 보관 · 전체 내보내기에 포함)</span></div>';
+  if(!naiPromptHist.length){h+='<div class="ns-note">아직 기록 없음 — 생성할 때마다 프롬프트·옵션·시드가 자동 저장됩니다.</div>';}
+  else{
+    naiPromptHist.slice(0,15).forEach((p,i)=>{
+      const d=new Date(p.ts);const z=x=>String(x).padStart(2,'0');
+      h+='<div class="nph-row"><span class="nph-meta">'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes())
+        +' · '+esc(p.name)+' · 시드 '+p.seed+' · '+esc(String(p.model||'').replace('nai-diffusion-',''))+'</span>'
+        +'<button class="ngal-btn" onclick="nsCopyHistPrompt('+i+',this)">📋</button></div>';
+    });
+    if(naiPromptHist.length>15)h+='<div class="ns-note">…외 '+(naiPromptHist.length-15)+'건 (전체는 내보내기 파일에서)</div>';
+    h+='<div class="ns-row"><button class="ngal-btn" onclick="if(confirm(\'프롬프트 기록을 모두 삭제할까?\'))nsClearPromptHist()">기록 전체 삭제</button></div>';
+  }
+  h+='</div>';
   h+='<div class="xm-btnrow"><button class="xm-btn pri" onclick="document.getElementById(\'nai-settings-modal\').classList.remove(\'on\')">닫기</button></div></div>';
   modal.innerHTML=h;
 }
@@ -3474,23 +3563,71 @@ window.nsPickDir=async function(){
   }catch(e){}
 };
 window.nsClearDir=async function(){naiDirHandle=null;await idbDel('saveDir');drawSettings();};
-window.nsExportSlots=function(){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(naiSlots,null,1)],{type:'application/json'}));
-  a.download='gahorok_slots.json';document.body.appendChild(a);a.click();a.remove();
+// ── 생성 옵션 지속화 ──
+function nsGetGenOpts(){
+  const g=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  return {res:g('nai-res'),model:g('nai-model'),steps:g('nai-steps'),scale:g('nai-scale')};
+}
+function nsApplyGenOpts(o){
+  if(!o||typeof o!=='object')return;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined&&v!==null&&v!=='')el.value=v;};
+  s('nai-res',o.res);s('nai-model',o.model);s('nai-steps',o.steps);s('nai-scale',o.scale);
+}
+function nsPersistGenOpts(){NAI_LS.set('gahorok_genopts',JSON.stringify(nsGetGenOpts()));}
+try{nsApplyGenOpts(JSON.parse(NAI_LS.get('gahorok_genopts')||'null'));}catch(e){}
+['nai-res','nai-model','nai-steps','nai-scale'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el)el.addEventListener('change',nsPersistGenOpts);
+});
+
+// ── 통합 설정 내보내기/가져오기 (키 제외) ──
+window.nsBuildSettings=function(){
+  return {app:'gahorok',kind:'settings',ver:1,exported:new Date().toISOString(),
+    slots:{common:(naiSlots&&naiSlots.common)||{},byAddr:(naiSlots&&naiSlots.byAddr)||{}},
+    genOpts:nsGetGenOpts(),
+    promptHistory:naiPromptHist,
+    proxy:NAI_LS.get('gahorok_proxy_url')||''};
 };
-window.nsImportSlots=function(inp){
+window.nsExportSettings=function(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(nsBuildSettings(),null,1)],{type:'application/json'}));
+  a.download='gahorok_settings.json';document.body.appendChild(a);a.click();a.remove();
+};
+window.nsApplySettings=function(j){
+  if(!j||typeof j!=='object')return '잘못된 형식';
+  let applied=[];
+  let slots=null,go=null,proxy;
+  if(j.kind==='settings'){slots=j.slots;go=j.genOpts;proxy=j.proxy;}
+  else if(j.common!==undefined||j.byAddr!==undefined){slots=j;}   // 구버전 slots.json
+  else return '알 수 없는 형식 — gahorok_settings.json 또는 slots.json이어야 함';
+  if(slots&&typeof slots==='object'){
+    naiSlots={common:slots.common||{},byAddr:slots.byAddr||{}};
+    clearTimeout(naiSlotsSaveTimer);   // 가져오기는 디바운스 없이 즉시 저장 (직후 이탈 시 유실 방지)
+    if(NAI_SERVER_MODE){fetch('/slots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(naiSlots)}).catch(()=>{});}
+    else{NAI_LS.set('gahorok_slots',JSON.stringify(naiSlots));}
+    applied.push('슬롯');
+  }
+  if(go&&typeof go==='object'){nsApplyGenOpts(go);nsPersistGenOpts();applied.push('생성 옵션');}
+  if(Array.isArray(j.promptHistory)){
+    naiPromptHist=j.promptHistory.slice(0,100);
+    NAI_LS.set('gahorok_prompt_history',JSON.stringify(naiPromptHist));
+    applied.push('프롬프트 기록');
+  }
+  if(proxy!==undefined&&!NAI_SERVER_MODE){
+    if(proxy)NAI_LS.set('gahorok_proxy_url',proxy);else NAI_LS.del('gahorok_proxy_url');
+    applied.push('프록시');
+  }
+  if(currentData)renderNAI(currentData);
+  return applied.length?('가져오기 완료: '+applied.join(' · ')):'적용할 항목 없음';
+};
+window.nsImportSettings=function(inp){
   const f=inp.files&&inp.files[0];if(!f)return;
   const rd=new FileReader();
   rd.onload=()=>{
-    try{
-      const j=JSON.parse(rd.result);
-      if(!j||typeof j!=='object')throw 0;
-      naiSlots={common:j.common||{},byAddr:j.byAddr||{}};
-      naiSaveSlots();
-      if(currentData)renderNAI(currentData);
-      alert('슬롯 가져오기 완료');
-    }catch(e){alert('잘못된 슬롯 JSON');}
+    let msg;
+    try{msg=nsApplySettings(JSON.parse(rd.result));}
+    catch(e){msg='잘못된 JSON 파일';}
+    alert(msg);drawSettings();
   };
   rd.readAsText(f);
 };
