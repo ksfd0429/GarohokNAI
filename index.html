@@ -2243,6 +2243,9 @@ function renderAppearance(d){
   let h=`<div style="text-align:center;padding:8px;margin-bottom:8px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;"><span style="font-size:10px;color:var(--dim);">인종</span><div style="font-size:14px;font-weight:700;color:var(--gold);margin-top:2px;">${ap.name}</div></div>`;
   h+=`<div style="font-size:9px;color:var(--dim);margin:8px 0 4px;letter-spacing:1px;">인종/종족 아키타입 (고정)</div>`;
   const sdefs=slotDefs(d);
+  const _rap=naiParts(d);
+  const _pk=b=>{const p=_rap.find(x=>x.key===b||x.key.indexOf(b+'@')===0);return p?p.key:b;};
+  const _pl=b=>{const p=_rap.find(x=>x.key===b||x.key.indexOf(b+'@')===0);return p?p.label:b;};
   [{l:'피부색',v:ap.skin,k:'skin'},{l:'모발색',v:ap.hairCol,k:'hair_col'},{l:'모발 형태',v:ap.hairType,k:'hair_type'},{l:'눈동자 색',v:ap.eyeCol,k:'eye_col'},{l:'특수',v:ap.extra||'없음',k:'extra'}].forEach(t=>{
     h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
   h+=`<div style="font-size:9px;color:var(--dim);margin:12px 0 4px;letter-spacing:1px;">원국 파생 (수치화 모델)</div>`;
@@ -2253,8 +2256,8 @@ function renderAppearance(d){
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">지방</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${fatPct}%;height:100%;background:linear-gradient(90deg,#3a7bd5,#c44536);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.fat>=0?'+':''}${bt.fat.toFixed(2)}</span></div>`;
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">근육</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${musPct}%;height:100%;background:linear-gradient(90deg,#888,#d4a843);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.muscle>=0?'+':''}${bt.muscle.toFixed(2)}</span></div>`;
   h+=`</div>`;
-  h+=slotRowEditor('body',sdefs['body']);
-  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:'키',v:hStr,k:'height'},{l:'눈꼬리',v:eyeCStr,k:'eye_shape'},{l:'눈동자 크기',v:pupilStr,k:'pupil'},{l:'눈썹 굵기',v:browStr,k:'brow'},{l:gdr==='f'?'유방 크기':'성기 크기',v:gTrait,k:'chest'}].concat(gdr==='f'?[{l:'골반/하체',v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:'pelvis'}]:[]).forEach(t=>{
+  h+=slotRowEditor(_pk('body'),sdefs[_pk('body')]);
+  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).forEach(t=>{
     h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
@@ -2900,21 +2903,29 @@ function naiParts(d){
   const ap=arch.data;
   const gdr=d.gender||'m';
   const bl=bodyLabel(bt.fat,bt.muscle);
+  // ── 등급 변형 토큰: 작음/큼 등 등급이 다르면 서로 다른 프리셋으로 분리 저장 ──
+  const vs=x=>String(x||'').replace(/\s+/g,'');
+  const hV=bt.height<150?'매우작음':bt.height<168?'작음':bt.height<183?'보통':bt.height<198?'큼':'매우큼';
+  const eyeV=bt.eyeC>=0.85?'날카로움':bt.eyeC>=0.5?'올라감':'처짐';
+  const puV=bt.pupil>=0.5?'큼':'작음';
+  const brV=bt.brow>=0.5?'짙음':'얇음';
+  const szLabel=gdr==='f'?sizeLabel5(bt.breast,raceId):penisLabel(bt.penis,raceId);
+  const plLabel=pelvisLabel(bt.pelvis);
   const parts=[
     {key:'skin',label:'피부색',def:ap.skinNai},
     {key:'hair_col',label:'모발색',def:ap.hairColNai},
     {key:'hair_type',label:'모발 형태',def:ap.hairTypeNai},
     {key:'eye_col',label:'눈동자 색',def:ap.eyeColNai},
     {key:'extra',label:'특수(귀·이빨·주근깨)',def:ap.extra||''},
-    {key:'body',label:'체형',def:bl[1]},
+    {key:'body@'+vs(bl[0]),label:'체형 ['+bl[0]+']',def:bl[1]},
     {key:'age_'+_ast.stage,label:'연령대 — '+_ast.label,def:ageStageDefault(_astSp,_ast.stage)},
-    {key:'height',label:'키/체구',def:''},
-    {key:'eye_shape',label:'눈꼬리',def:bt.eyeC>=0.85?'sharp eyes, narrow eyes':bt.eyeC>=0.5?'upturned eyes':'droopy eyes, downturned eyes'},
-    {key:'pupil',label:'눈동자 크기',def:bt.pupil>=0.5?'large eyes':'small eyes'},
-    {key:'brow',label:'눈썹',def:bt.brow>=0.5?'thick eyebrows':'thin eyebrows'},
-    {key:'chest',label:gdr==='f'?'유방':'성기',def:gdr==='f'?sizeNaiBreast(bt.breast,raceId):sizeNaiPenis(bt.penis,raceId)}
+    {key:'height@'+hV,label:'키/체구 ['+hV+']',def:''},
+    {key:'eye_shape@'+vs(eyeV),label:'눈꼬리 ['+eyeV+']',def:bt.eyeC>=0.85?'sharp eyes, narrow eyes':bt.eyeC>=0.5?'upturned eyes':'droopy eyes, downturned eyes'},
+    {key:'pupil@'+vs(puV),label:'눈동자 크기 ['+puV+']',def:bt.pupil>=0.5?'large eyes':'small eyes'},
+    {key:'brow@'+vs(brV),label:'눈썹 ['+brV+']',def:bt.brow>=0.5?'thick eyebrows':'thin eyebrows'},
+    {key:'chest@'+vs(szLabel),label:(gdr==='f'?'유방':'성기')+' ['+szLabel+']',def:gdr==='f'?sizeNaiBreast(bt.breast,raceId):sizeNaiPenis(bt.penis,raceId)}
   ];
-  if(gdr==='f')parts.push({key:'pelvis',label:'골반/하체',def:pelvisNai(bt.pelvis)||''});
+  if(gdr==='f')parts.push({key:'pelvis@'+vs(plLabel),label:'골반/하체 ['+plLabel+']',def:pelvisNai(bt.pelvis)||''});
   return parts;
 }
 function slotVal(addr,key,def){
