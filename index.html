@@ -3121,6 +3121,11 @@ document.head.appendChild(_st);
 const _wrap=document.createElement('div');
 _wrap.innerHTML=`<div id="chart-modal"></div><div id="compat-modal"></div><div id="print-root"></div>`;
 while(_wrap.firstChild)document.body.appendChild(_wrap.firstChild);
+// 모달 외부(오버레이) 클릭 → 자동 닫기
+['chart-modal','compat-modal'].forEach(function(id){
+  const el=document.getElementById(id);
+  if(el)el.addEventListener('pointerdown',function(e){if(e.target===el)el.classList.remove('on');});
+});
 
 // ── 공용 헬퍼 ──
 const ELS=['wood','fire','earth','metal','water'];
@@ -3390,7 +3395,8 @@ async function runCompat(d,gdr){
         if(proj>45000)hrStep=2;
       }
       await new Promise(r=>setTimeout(r,0));
-      if(!document.getElementById('cs-prog')){_csRunning=false;return;}   // 모달 닫힘 → 중단
+      const _cm=document.getElementById('compat-modal');
+      if(!document.getElementById('cs-prog')||!(_cm&&_cm.classList.contains('on'))){_csRunning=false;return;}   // 모달 닫힘 → 중단
     }
     const elapsed=((Date.now()-t0)/1000).toFixed(1);
     // 표시용 후보 수집 (idx 부여)
