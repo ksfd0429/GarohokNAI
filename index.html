@@ -28,9 +28,11 @@ body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',sans-serif
 .syn-hl{color:var(--txt);font-weight:600;}
 .syn-el{font-weight:600;}
 .syn-h{color:#c47a9e;}
-.tog{display:flex;margin:14px 0 4px;background:var(--bg2);border-radius:7px;padding:2px;border:1px solid var(--bdr);}
-.tog-b{flex:1;text-align:center;padding:6px 0;font-size:10px;font-weight:500;color:var(--dim);border-radius:5px;cursor:pointer;}
-.tog-b.on{background:var(--card);color:var(--txt);box-shadow:0 1px 6px rgba(0,0,0,.3);}
+.tog{display:flex;gap:3px;margin:14px 0 3px;background:var(--bg2);border-radius:8px;padding:3px;border:1px solid var(--bdr);}
+.tog.tog2{margin:0 0 4px;}
+.tog-b{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;min-height:30px;padding:5px 2px;font-size:10px;font-weight:500;color:var(--dim);background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tog-b:active{transform:translateY(1px);}
+.tog-b.on{background:var(--card);color:var(--gold);border-color:rgba(212,168,67,.4);box-shadow:0 1px 6px rgba(0,0,0,.3);}
 .tabs{display:flex;margin:14px 0 0;border-bottom:1px solid var(--bdr);}
 .tab{flex:1;text-align:center;padding:8px 0;font-size:11px;font-weight:500;color:var(--dim);cursor:pointer;position:relative;}
 .tab.on{color:var(--gold);}
@@ -310,7 +312,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
 </div>
 <div id="layout">
 <div class="ct">
-  <div class="tog"><div class="tog-b" onclick="setMode('player')" id="mp">플레이어</div><div class="tog-b on" onclick="setMode('npc')" id="mn">NPC</div><div class="tog-b" onclick="randomNpc()" id="mr">🎲</div><div class="tog-b" onclick="showDesignModal()" id="md">🔧 설계</div><div class="tog-b" onclick="showChartEdit()" id="mce">✍️ 내 원국</div><div class="tog-b" onclick="showCompatSim()" id="mcs">💞 궁합시뮬</div><div class="tog-b" onclick="exportPDF()" id="mpdf">📄 PDF</div><div class="tog-b" onclick="showNaiSettings()" id="mset">⚙️</div></div>
+  <div class="tog"><div class="tog-b" onclick="setMode('player')" id="mp">플레이어</div><div class="tog-b on" onclick="setMode('npc')" id="mn">NPC</div><div class="tog-b" onclick="randomNpc()" id="mr">🎲 랜덤</div><div class="tog-b" onclick="showDesignModal()" id="md">🔧 설계</div></div><div class="tog tog2"><div class="tog-b" onclick="showChartEdit()" id="mce">✍️ 내 원국</div><div class="tog-b" onclick="showCompatSim()" id="mcs">💞 궁합시뮬</div><div class="tog-b" onclick="exportPDF()" id="mpdf">📄 PDF</div><div class="tog-b" onclick="showNaiSettings()" id="mset">⚙️ 설정</div></div>
   <div class="hdr"><div class="hdr-t">가 호 록</div><div class="hdr-n" id="cn"></div><div class="hdr-i" id="ci"></div><div class="hdr-s" id="cs"></div><div class="badge" id="cb"></div><div class="badge" id="cr" style="display:none;background:rgba(74,124,89,.15);color:#8a8778;margin-left:4px;"></div></div>
   <div class="synopsis" id="synopsis"></div>
   <div class="tabs"><div class="tab on" onclick="stab('gaho',this)">가호</div><div class="tab" onclick="stab('stat',this)">전투</div><div class="tab" onclick="stab('compat',this)">궁합</div><div class="tab" onclick="stab('attract',this)">끌림</div><div class="tab" onclick="stab('appear',this)">외형</div></div>
