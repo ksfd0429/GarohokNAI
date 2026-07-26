@@ -1726,10 +1726,10 @@ function dmRankW(i){return DM_RANK_W[i]!==undefined?DM_RANK_W[i]:1.2;}
 const DM_LIFESPAN={human:75,elf:800,darkelf:800,dwarf:130,orc:40,ogre:180};
 // 인간 하위인종별 체형 레인지 중앙값 (년간오행→인종 파생이 체형 레인지를 바꾸는 것 보정)
 const DM_ETHNO_MID={
-  2:{helia:180,rugen:175,nahar:180,osela:184,ryuan:185},   // 키
-  3:{helia:17,rugen:15,nahar:19,osela:20,ryuan:18},        // 성기
-  4:{helia:5,rugen:4,nahar:7,osela:8,ryuan:6},             // 유방
-  8:{helia:95,rugen:92,nahar:100,osela:102,ryuan:96}       // 골반
+  2:{helia:180,rugen:185,nahar:180,osela:184,ryuan:175},   // 키 (루겐=장신 교정)
+  3:{helia:17,rugen:18,nahar:19,osela:20,ryuan:15},        // 성기
+  4:{helia:5,rugen:6,nahar:7,osela:8,ryuan:4},             // 유방
+  8:{helia:95,rugen:96,nahar:100,osela:102,ryuan:92}       // 골반
 };
 function dmEthnoRangeFactor(ganEl){
   if(dmState.race!=='human'||!dmState.body.length)return 1;
@@ -2128,13 +2128,13 @@ const STEM_WORLD={'甲':'참나무','乙':'화분','丙':'태양','丁':'등불'
 const BRANCH_WORLD={'子':'노크탄','丑':'그란디르','寅':'프레간','卯':'플로렌','辰':'레그나스','巳':'벨리스','午':'솔란','未':'큐라','申':'크리시스','酉':'스펠라','戌':'에르미탄','亥':'레바'};
 
 function calcBodyTraits(d,race){
-  const _rFB={helia:-0.05,ryuan:-0.15,nahar:0.10,osela:0.25,rugen:-0.20,elf:-0.25,orc:0.10,ogre:0.35,dwarf:0.15,darkelf:-0.10};
-  const _rMB={helia:0.05,ryuan:0.15,nahar:-0.15,osela:0.25,rugen:-0.10,elf:-0.25,orc:0.35,ogre:0.25,dwarf:0.30,darkelf:-0.20};
-  const _rPB={helia:0,ryuan:-0.2,nahar:0.15,osela:-0.05,rugen:0.1,elf:-0.6,orc:0.45,ogre:1.0,dwarf:-1.0,darkelf:0.6};
-  const _rBB={helia:0,ryuan:-0.15,nahar:0.1,osela:0.05,rugen:0,elf:-0.6,orc:-0.2,ogre:0.8,dwarf:-0.8,darkelf:0.5};
+  const _rFB={helia:-0.05,ryuan:-0.20,nahar:0.10,osela:0.25,rugen:-0.15,elf:-0.25,orc:0.10,ogre:0.35,dwarf:0.15,darkelf:-0.10};
+  const _rMB={helia:0.05,ryuan:-0.10,nahar:-0.15,osela:0.25,rugen:0.15,elf:-0.25,orc:0.35,ogre:0.25,dwarf:0.30,darkelf:-0.20};
+  const _rPB={helia:0,ryuan:0.1,nahar:0.15,osela:-0.05,rugen:-0.2,elf:-0.6,orc:0.45,ogre:1.0,dwarf:-1.0,darkelf:0.6};
+  const _rBB={helia:0,ryuan:0,nahar:0.1,osela:0.05,rugen:-0.15,elf:-0.6,orc:-0.2,ogre:0.8,dwarf:-0.8,darkelf:0.5};
   const _rBrB={helia:0.05,ryuan:-0.10,nahar:-0.08,osela:0.15,rugen:-0.10,elf:-0.12,orc:0.10,ogre:0.12,dwarf:0.08,darkelf:-0.08};
-  const _rEB={helia:0.05,ryuan:0.12,nahar:-0.10,osela:-0.10,rugen:-0.08,elf:-0.10,orc:0.08,ogre:-0.08,dwarf:0.08,darkelf:0.05};
-  const _rPuB={helia:0.05,ryuan:-0.08,nahar:0.05,osela:-0.10,rugen:0.10,elf:0.08,orc:-0.15,ogre:-0.10,dwarf:-0.10,darkelf:0.05};
+  const _rEB={helia:0.05,ryuan:-0.08,nahar:-0.10,osela:-0.10,rugen:0.12,elf:-0.10,orc:0.08,ogre:-0.08,dwarf:0.08,darkelf:0.05};
+  const _rPuB={helia:0.05,ryuan:0.10,nahar:0.05,osela:-0.10,rugen:-0.08,elf:0.08,orc:-0.15,ogre:-0.10,dwarf:-0.10,darkelf:0.05};
   const _rPlB={helia:0,ryuan:-0.05,nahar:0.05,osela:0.10,rugen:-0.05,elf:-0.15,orc:0.10,ogre:0.20,dwarf:0.15,darkelf:0};
   const base={fat:(_rFB[race]||0)*4,muscle:(_rMB[race]||0)*4,height:0,penis:0,breast:0,brow:(0.5+(_rBrB[race]||0))*4,eyeC:(0.5+(_rEB[race]||0))*4,pupil:(0.5+(_rPuB[race]||0))*4,pelvis:0};
   if(!d||!d.p)return base;
@@ -2158,21 +2158,21 @@ function calcBodyTraits(d,race){
   // 4기둥 평균화 (8개 기여값의 합을 기둥 수로 나눔)
   base.fat/=4;base.muscle/=4;base.height/=4;
   // 종족별 키: 선형 매핑 (raw delta [-80,144] → [tMin,tMax])
-  const _rHT={helia:[172,188],ryuan:[175,195],nahar:[168,192],osela:[172,196],rugen:[165,185],elf:[187,199],orc:[170,202],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
+  const _rHT={helia:[172,188],ryuan:[165,185],nahar:[168,192],osela:[172,196],rugen:[175,195],elf:[187,199],orc:[170,202],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
   const _ht=_rHT[race]||[172,188];
   base.height=_ht[0]+(base.height-(-80))/(144-(-80))*(_ht[1]-_ht[0]);
   base.penis/=4;base.breast/=4;
   base.brow/=4;base.eyeC/=4;base.pupil/=4;base.pelvis/=4;
   // 남성기: 종족별 선형 매핑 (raw [-3.2,5.6] → [tMin,tMax] cm)
-  const _rPnT={helia:[7,27],ryuan:[8,28],nahar:[9,29],osela:[10,30],rugen:[5,25],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};
+  const _rPnT={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};
   const _pnt=_rPnT[race]||[7,27];
   base.penis=_pnt[0]+(base.penis-(-3.2))/(5.6-(-3.2))*(_pnt[1]-_pnt[0]);
   // 유방: 종족별 선형 매핑 (raw [-3.2,4.8] → [tMin,tMax] 컵인덱스)
-  const _rBrT={helia:[1,9],ryuan:[2,10],nahar:[3,11],osela:[4,12],rugen:[0,8],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};
+  const _rBrT={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};
   const _brt=_rBrT[race]||[1,9];
   base.breast=_brt[0]+(base.breast-(-3.2))/(4.8-(-3.2))*(_brt[1]-_brt[0]);
   // 골반/하체: 선형 매핑 (raw [-0.20,0.40] → 종족별 [tMin,tMax] cm)
-  const _rPlT={helia:[83,107],ryuan:[84,108],nahar:[88,112],osela:[90,114],rugen:[80,104],elf:[78,102],orc:[86,110],ogre:[110,150],dwarf:[70,94],darkelf:[92,116]};
+  const _rPlT={helia:[83,107],ryuan:[80,104],nahar:[88,112],osela:[90,114],rugen:[84,108],elf:[78,102],orc:[86,110],ogre:[110,150],dwarf:[70,94],darkelf:[92,116]};
   const _plt=_rPlT[race]||[83,107];
   base.pelvis=_plt[0]+(base.pelvis-(-0.20))/(0.40-(-0.20))*(_plt[1]-_plt[0]);
   // clamp
@@ -2202,11 +2202,11 @@ function heightLabel(hCm,gender,raceId){
   return Math.round(gender==='f'?hCm*0.85:hCm)+'cm';
 }
 
-function sizeLabel5(v,race){const R={helia:[1,9],ryuan:[2,10],nahar:[3,11],osela:[4,12],rugen:[0,8],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
-function sizeNaiBreast(v,race){const R={helia:[1,9],ryuan:[2,10],nahar:[3,11],osela:[4,12],rugen:[0,8],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'flat chest';if(t<s*2)return'small breasts';if(t<s*3)return'medium breasts';if(t<s*4)return'large breasts';return'huge breasts';}
-function sizeNaiPenis(v,race){const R={helia:[7,27],ryuan:[8,28],nahar:[9,29],osela:[10,30],rugen:[5,25],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'micro penis';if(t<s*2)return'small penis';if(t<s*3)return'average penis';if(t<s*4)return'large penis';return'huge penis';}
+function sizeLabel5(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
+function sizeNaiBreast(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'flat chest';if(t<s*2)return'small breasts';if(t<s*3)return'medium breasts';if(t<s*4)return'large breasts';return'huge breasts';}
+function sizeNaiPenis(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'micro penis';if(t<s*2)return'small penis';if(t<s*3)return'average penis';if(t<s*4)return'large penis';return'huge penis';}
 function penisCm(v){return v.toFixed(1);}
-function penisLabel(v,race){const R={helia:[7,27],ryuan:[8,28],nahar:[9,29],osela:[10,30],rugen:[5,25],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
+function penisLabel(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
 function breastCup(v){const cups=['AA','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q'];return cups[Math.max(0,Math.min(17,Math.round(v)))]||'E';}
 function pelvisLabel(v){if(v>=112)return'매우 큼';if(v>=100)return'큼';if(v>=90)return'보통';if(v>=80)return'작음';return'매우 작음';}
 function pelvisNai(v){if(v>=112)return'wide hips, thick thighs';if(v>=100)return'wide hips';if(v>=90)return'';if(v>=80)return'narrow hips';return'narrow hips, thin legs';}
@@ -3332,36 +3332,59 @@ function compatAxesWith(C,b){
 function compatAxes(a,b){return compatAxesWith(compatCtx(a),b);}
 window._csHelpers={CHUNG_J:CHUNG_J,YUKHAP_J:YUKHAP_J,isWonjin:isWonjin,inSamhap:inSamhap,isHyeong:isHyeong,compatCtx:compatCtx,compatAxesWith:compatAxesWith,tidOfJ:tidOfJ,elOf:elOf,cands:()=>csCands};
 let csCands=[];
-let _csRunning=false;
+let _csGen=0;
+let csFilter={gdr:null,race:'human',stage:'any',open:0};
+window.csSetRace=function(v){csFilter.race=v;showCompatSim(csFilter.gdr);};
+window.csSetStage=function(v){csFilter.stage=v;showCompatSim(csFilter.gdr);};
+window.csToggleSec=function(i){
+  const el=document.getElementById('cs-axbody-'+i);
+  const ar=document.getElementById('cs-axarr-'+i);
+  if(!el)return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(ar)ar.textContent=open?'▾':'▸';
+};
 window.showCompatSim=function(g){
   const d=currentData;
   if(!d||!d.p||!d.p[1].g||!d.p[1].g.e){alert('일간이 지정된 원국이 필요합니다. ✍️ 내 원국에서 최소 일주를 지정하세요.');return;}
-  if(_csRunning)return;
-  const gdr=g||((d.gender||'m')==='m'?'f':'m');
+  const gdr=g||csFilter.gdr||((d.gender||'m')==='m'?'f':'m');
+  csFilter.gdr=gdr;
+  _csGen++;                       // 진행 중 스캔이 있으면 취소하고 새 스캔
+  const myGen=_csGen;
   const m=document.getElementById('compat-modal');
   m.classList.add('on');
-  m.innerHTML=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div><div class="xm-sub" id="cs-prog">오르비아력 성인 전 원국 전수 스캔 준비 중…</div></div>`;
-  setTimeout(()=>runCompat(d,gdr),30);
+  m.innerHTML=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div><div class="xm-sub" id="cs-prog">전수 스캔 준비 중…</div></div>`;
+  setTimeout(()=>runCompat(d,gdr,myGen),30);
 };
-async function runCompat(d,gdr){
-  _csRunning=true;
+async function runCompat(d,gdr,gen){
   try{
     const C=compatCtx(d);
-    const Y1=ORVIA_YEAR-18,Y0=ORVIA_YEAR-45;   // 성인 18~45세 전 생년
+    // ── 필터: 종족 × 연령대 → 스캔 생년 범위 ──
+    const race=csFilter.race||'human';
+    const R=RACES[race]||RACES.human;
+    const bd=AGE_STAGES[race]||AGE_STAGES.human;
+    const life=(typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[race])||75;
+    let loA=R.minAge,hiA=R.maxAge;
+    const stg=csFilter.stage||'any';
+    if(stg==='youth'){hiA=Math.min(hiA,bd[0]-1);}
+    else if(stg==='middle'){loA=Math.max(loA,bd[0]);hiA=bd[1]-1;}
+    else if(stg==='elder'){loA=Math.max(loA,bd[1]);hiA=life;}
+    if(hiA<loA)hiA=loA;
+    const Y0=ORVIA_YEAR-hiA,Y1=ORVIA_YEAR-loA;
     const AXK=['phys','val','total'];
-    const KEEP=3;
+    const KEEP=10;
     const best={},worst={},mn={},mx={};
     AXK.forEach(k=>{best[k]=[];worst[k]=[];mn[k]=Infinity;mx[k]=-Infinity;});
     let scanned=0;
     const t0=Date.now();
-    let hrStep=1;   // 시주 전수(12시진). 느린 기기면 첫 해 측정 후 2로 자동 완화
+    let hrStep=1;
     const yearsTotal=Y1-Y0+1;
     for(let y=Y0;y<=Y1;y++){
       for(let mo=1;mo<=12;mo++){
         const dim=dimOf(y,mo);
         for(let dy=1;dy<=dim;dy++){
           for(let hr=0;hr<12;hr+=hrStep){
-            const s=calcSajuFromDate(y,mo,dy,hr,'none');   // 60갑자 정합 실존 원국
+            const s=calcSajuFromDate(y,mo,dy,hr,'none');
             const cd={p:s.p,el:elOf(s.p),gender:gdr};
             const ax=compatAxesWith(C,cd);
             scanned++;
@@ -3371,13 +3394,13 @@ async function runCompat(d,gdr){
               if(v>mx[k])mx[k]=v;
               const B=best[k];
               if(B.length<KEEP||v>B[B.length-1].s){
-                B.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,ax:ax}});
+                B.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,race:race,ax:ax}});
                 B.sort((p,q)=>q.s-p.s);
                 if(B.length>KEEP)B.length=KEEP;
               }
               const W=worst[k];
               if(W.length<KEEP||v<W[W.length-1].s){
-                W.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,ax:ax}});
+                W.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,race:race,ax:ax}});
                 W.sort((p,q)=>p.s-q.s);
                 if(W.length>KEEP)W.length=KEEP;
               }
@@ -3385,21 +3408,20 @@ async function runCompat(d,gdr){
           }
         }
       }
-      // 진행률 + 양보 (매 해)
       const done=y-Y0+1;
       const prog=document.getElementById('cs-prog');
       if(prog)prog.textContent='전수 스캔 중… '+Math.round(done/yearsTotal*100)+'% ('+scanned.toLocaleString()+'명)';
-      // 첫 해 측정 후 저속 기기 자동 완화 (전체 예상 45초 초과 시 시주 2간격)
       if(done===1){
         const proj=(Date.now()-t0)*yearsTotal;
         if(proj>45000)hrStep=2;
       }
       await new Promise(r=>setTimeout(r,0));
+      if(gen!==_csGen)return;   // 필터 변경 등으로 새 스캔 시작 → 이 스캔 폐기
       const _cm=document.getElementById('compat-modal');
-      if(!document.getElementById('cs-prog')||!(_cm&&_cm.classList.contains('on'))){_csRunning=false;return;}   // 모달 닫힘 → 중단
+      if(!_cm||!_cm.classList.contains('on'))return;   // 모달 닫힘 → 중단
     }
+    if(gen!==_csGen)return;
     const elapsed=((Date.now()-t0)/1000).toFixed(1);
-    // 표시용 후보 수집 (idx 부여)
     csCands=[];
     const seen=new Map();
     const reg=c=>{
@@ -3414,49 +3436,70 @@ async function runCompat(d,gdr){
       {k:'val',rk:'rv',icon:'🧭',name:'지향·성격 궁합'},
       {k:'total',rk:null,icon:'💍',name:'종합 궁합'}
     ];
+    const raceOpts=[['human','인간'],['elf','엘프'],['darkelf','다크엘프'],['orc','오크'],['ogre','오거'],['dwarf','드워프']];
+    const stageOpts=[['any','전체 연령'],['youth','초년기'],['middle','중년기'],['elder','말년기']];
+    const stageNote=stg==='any'?'':' · '+({youth:'초년기',middle:'중년기',elder:'말년기'})[stg];
     let h=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div>
-    <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · 성인 전 원국 ${scanned.toLocaleString()}명 전수 스캔 (${elapsed}초${hrStep>1?' · 시주 2간격':''}) — 같은 원국이면 결과 항상 동일</div>
-    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;">
+    <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · ${(RACES[race]||{}).name||race}${stageNote} ${loA}~${hiA}세 · ${scanned.toLocaleString()}명 전수 스캔 (${elapsed}초${hrStep>1?' · 시주 2간격':''}) — 결정론</div>
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
       <button class="xm-btn ${gdr==='m'?'pri':''}" onclick="showCompatSim('m')">상대 ♂</button>
       <button class="xm-btn ${gdr==='f'?'pri':''}" onclick="showCompatSim('f')">상대 ♀</button>
+      <select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetRace(this.value)">${raceOpts.map(o=>`<option value="${o[0]}"${race===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>
+      <select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetStage(this.value)">${stageOpts.map(o=>`<option value="${o[0]}"${stg===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>
     </div>`;
-    axes.forEach(A=>{
+    axes.forEach((A,ai)=>{
       const pct=v=>Math.round((v-mn[A.k])/(mx[A.k]-mn[A.k]||1)*100);
       const rsOf=c=>A.rk?c.ax[A.rk]:[...c.ax.rp,...c.ax.rv];
       const row=(e,cls)=>{
         const c=e.c;const idx=reg(c);
         return `<div class="cs-row ${cls}">${chartMini(c.saju.p)}<div style="flex:1;min-width:0;"><div class="cs-rsn">${rsOf(c).join(' · ')||'무난한 흐름'}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><div class="cs-score" style="width:auto;color:${cls==='best1'?'#5cb87a':cls==='worst1'?'#c44536':'var(--txt)'}">${pct(c.ax[A.k])}</div><button class="cs-load" onclick="csSpawn(${idx})">시뮬 →</button></div></div>`;
       };
-      h+=`<div class="cs-sec" style="color:var(--gold);border-top:1px solid var(--bdr);padding-top:12px;margin-top:14px;font-size:11px;">${A.icon} ${A.name}</div>`;
-      h+=`<div class="cs-sec" style="color:#5cb87a;">찰떡 TOP</div>`+best[A.k].map((e,i)=>row(e,i===0?'best1':'')).join('');
-      h+=`<div class="cs-sec" style="color:#c44536;">최악 TOP</div>`+worst[A.k].map((e,i)=>row(e,i===0?'worst1':'')).join('');
+      const open=ai===(csFilter.open||0);
+      h+=`<div class="cs-sec" onclick="csToggleSec(${ai})" style="color:var(--gold);border-top:1px solid var(--bdr);padding-top:12px;margin-top:14px;font-size:11px;cursor:pointer;user-select:none;"><span id="cs-axarr-${ai}">${open?'▾':'▸'}</span> ${A.icon} ${A.name} <span style="color:var(--dim);font-weight:400;font-size:9px;">TOP10 · 최악10</span></div>`;
+      h+=`<div id="cs-axbody-${ai}" style="display:${open?'block':'none'}">`;
+      h+=`<div class="cs-sec" style="color:#5cb87a;">찰떡 TOP 10</div>`+best[A.k].map((e,i2)=>row(e,i2===0?'best1':'')).join('');
+      h+=`<div class="cs-sec" style="color:#c44536;">최악 TOP 10</div>`+worst[A.k].map((e,i2)=>row(e,i2===0?'worst1':'')).join('');
+      h+=`</div>`;
     });
     h+=`<div class="xm-btnrow"><button class="xm-btn" onclick="document.getElementById('compat-modal').classList.remove('on')">닫기</button></div></div>`;
     document.getElementById('compat-modal').innerHTML=h;
     window._lastCompatHTML=h;
-  }finally{_csRunning=false;}
+  }finally{}
 }
 window.csSpawn=function(idx){
   const c=csCands.find(x=>x.idx===idx);if(!c)return;
   const gdr=c.cd.gender;
-  const eth=ELEM_TO_ETHNO[c.saju.p[3].g.e]||'helia';
-  const MP={helia:RNAMES_HELIA_M,ryuan:RNAMES_RYUAN_M,nahar:RNAMES_NAHAR_M,osela:RNAMES_OSELA_M,rugen:RNAMES_RUGEN_M};
-  const FP={helia:RNAMES_HELIA_F,ryuan:RNAMES_RYUAN_F,nahar:RNAMES_NAHAR_F,osela:RNAMES_OSELA_F,rugen:RNAMES_RUGEN_F};
-  const SP={helia:SURNAMES_HELIA,ryuan:SURNAMES_RYUAN,nahar:SURNAMES_NAHAR,osela:SURNAMES_OSELA,rugen:SURNAMES_RUGEN};
-  const fn=pick(gdr==='m'?MP[eth]:FP[eth]),sn=Math.random()<0.65?pick(SP[eth]):'';
+  const race=c.race||'human';
+  let eth=null,raceName,fn,sn='';
+  if(race==='human'){
+    eth=ELEM_TO_ETHNO[c.saju.p[3].g.e]||'helia';
+    const MP={helia:RNAMES_HELIA_M,ryuan:RNAMES_RYUAN_M,nahar:RNAMES_NAHAR_M,osela:RNAMES_OSELA_M,rugen:RNAMES_RUGEN_M};
+    const FP={helia:RNAMES_HELIA_F,ryuan:RNAMES_RYUAN_F,nahar:RNAMES_NAHAR_F,osela:RNAMES_OSELA_F,rugen:RNAMES_RUGEN_F};
+    const SP={helia:SURNAMES_HELIA,ryuan:SURNAMES_RYUAN,nahar:SURNAMES_NAHAR,osela:SURNAMES_OSELA,rugen:SURNAMES_RUGEN};
+    fn=pick(gdr==='m'?MP[eth]:FP[eth]);sn=Math.random()<0.65?pick(SP[eth]):'';
+    raceName=(ETHNO[eth]||{name:'인간'}).name;
+  }else{
+    const MP={elf:RNAMES_ELF_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
+    const FP={elf:RNAMES_ELF_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
+    const SP={elf:SURNAMES_ELF,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
+    fn=pick(gdr==='m'?(MP[race]||RNAMES_M):(FP[race]||RNAMES_F));sn=Math.random()<0.65?pick(SP[race]||SURNAMES):'';
+    raceName=(RACES[race]||{}).name||race;
+  }
+  const ar=(RACES[race]||{}).ageRatio||1;
+  const appAge=Math.floor(c.age*ar);
+  const ageStr=appAge!==c.age?`${appAge}세(실제 ${c.age}세)`:`${c.age}세`;
   const lv=5+Math.floor(Math.random()*45),rk=['F','E','D','C','B','A','S'][Math.min(Math.floor(lv/7),6)];
   const b=c.saju.birth;
   const rd={name:sn?sn+' '+fn:fn,surname:sn,firstname:fn,
-    info:`Lv.${lv} · ${c.saju.p[1].g.n}자리 · ${rk}랭크 · ${gdr==='m'?'♂':'♀'} · ${(ETHNO[eth]||{name:'인간'}).name}`,
-    sub:`${b.year}년 ${b.month}월 ${b.day}일생 · ${c.age}세 · ${chartStr(c.saju.p)}`,
-    badge:'궁합 시뮬',gender:gdr,race:'human',ethno:eth,
-    p:c.saju.p,el:elOf(c.saju.p),birth:b,appAge:c.age,
+    info:`Lv.${lv} · ${c.saju.p[1].g.n}자리 · ${rk}랭크 · ${gdr==='m'?'♂':'♀'} · ${raceName}`,
+    sub:`${b.year}년 ${b.month}월 ${b.day}일생 · ${ageStr} · ${chartStr(c.saju.p)}`,
+    badge:'궁합 시뮬',gender:gdr,race:race,ethno:eth||undefined,
+    p:c.saju.p,el:elOf(c.saju.p),birth:b,appAge:appAge,
     st:{ap:3+Math.floor(Math.random()*8),speed:30+Math.floor(Math.random()*60),hp:120+Math.floor(Math.random()*280),power:20+Math.floor(Math.random()*70),precision:20+Math.floor(Math.random()*70),resist:15+Math.floor(Math.random()*60)}};
   document.getElementById('compat-modal').classList.remove('on');
   mode='npc';document.getElementById('mn').className='tog-b on';document.getElementById('mp').className='tog-b';
   render(rd);
 };
-
 // ═══ 3. PDF 내보내기 (다중 페이지 인쇄 파이프라인) ═══
 // ── 인쇄 전용 원국표 (CSS 의존 없음 · 인라인 스타일) ──
 function printSajuTable(d){
