@@ -2257,7 +2257,12 @@ function renderAppearance(d){
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">근육</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${musPct}%;height:100%;background:linear-gradient(90deg,#888,#d4a843);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.muscle>=0?'+':''}${bt.muscle.toFixed(2)}</span></div>`;
   h+=`</div>`;
   h+=slotRowEditor(_pk('body'),sdefs[_pk('body')]);
-  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).forEach(t=>{
+  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
+    {l:_pl('butt'),v:'',k:_pk('butt')},{l:_pl('thigh'),v:'',k:_pk('thigh')},
+    {l:_pl('waist'),v:'',k:_pk('waist')},{l:_pl('shoulder'),v:'',k:_pk('shoulder')},
+    {l:_pl('belly'),v:'',k:_pk('belly')},{l:_pl('lips'),v:'',k:_pk('lips')},
+    {l:_pl('limbs'),v:'',k:_pk('limbs')}
+  ]).forEach(t=>{
     h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
@@ -2926,6 +2931,41 @@ function naiParts(d){
     {key:'chest@'+vs(szLabel),label:(gdr==='f'?'유방':'성기')+' ['+szLabel+']',def:gdr==='f'?sizeNaiBreast(bt.breast,raceId):sizeNaiPenis(bt.penis,raceId)}
   ];
   if(gdr==='f')parts.push({key:'pelvis@'+vs(plLabel),label:'골반/하체 ['+plLabel+']',def:pelvisNai(bt.pelvis)||''});
+  // ── 부위 상세 (종족/인종 보정된 파생치 → 부위별 크기 등급 프리셋) ──
+  let _pIdx=['매우작음','작음','보통','큼','매우큼'].indexOf(vs(plLabel));
+  if(_pIdx<0)_pIdx=2;
+  const el=d.el||{};
+  // 엉덩이: 골반 등급 + 지방 보정
+  const buttI=Math.max(0,Math.min(4,_pIdx+(bt.fat>=0.3?1:bt.fat<=-0.3?-1:0)));
+  const buttL=['빈약','작음','보통','큼','매우큼'][buttI];
+  parts.push({key:'butt@'+buttL,label:'엉덩이 ['+buttL+']',def:['flat ass','small ass','','big ass','huge ass, bubble butt'][buttI]});
+  // 허벅지: 골반 등급 + 지방
+  const thI=Math.max(0,Math.min(4,_pIdx+(bt.fat>=0.15?1:bt.fat<=-0.15?-1:0)));
+  const thL=['가늚','날씬','보통','두꺼움','매우두꺼움'][thI];
+  parts.push({key:'thigh@'+thL,label:'허벅지 ['+thL+']',def:['thin thighs','slender legs','','thick thighs','very thick thighs'][thI]});
+  // 허리: 지방 반비례
+  const waI=bt.fat<=-0.3?0:bt.fat<=-0.1?1:bt.fat<0.15?2:bt.fat<0.35?3:4;
+  const waL=['매우잘록','잘록','보통','두꺼움','매우두꺼움'][waI];
+  parts.push({key:'waist@'+waL,label:'허리 ['+waL+']',def:['very narrow waist, slim waist','narrow waist','','thick waist','wide waist, thick torso'][waI]});
+  // 어깨·골격: 근육 + 성별 보정
+  const shV=bt.muscle+(gdr==='m'?0.15:-0.15);
+  const shI=shV<=-0.3?0:shV<-0.1?1:shV<0.25?2:shV<0.45?3:4;
+  const shL=['매우좁음','좁음','보통','넓음','매우넓음'][shI];
+  parts.push({key:'shoulder@'+shL,label:'어깨·골격 ['+shL+']',def:['narrow shoulders','sloping shoulders','','broad shoulders','very broad shoulders, muscular back'][shI]});
+  // 복부: 지방 vs 근육
+  const beV=bt.fat-bt.muscle*0.6;
+  const beI=beV<=-0.5?0:beV<=-0.2?1:beV<0.2?2:beV<0.5?3:4;
+  const beL=['복근','탄탄','보통','말랑','볼록'][beI];
+  parts.push({key:'belly@'+beL,label:'복부 ['+beL+']',def:['toned stomach, abs','flat stomach','','soft belly, plump belly','big belly'][beI]});
+  // 입술: 화(火) 비중 (혈색·입술은 火 재료)
+  const liF=el.fire||0;
+  const liI=liF<10?0:liF<18?1:liF<28?2:3;
+  const liL=['얇음','보통','도톰','두툼'][liI];
+  parts.push({key:'lips@'+liL,label:'입술 ['+liL+']',def:['thin lips','','full lips','thick lips, glossy lips'][liI]});
+  // 팔다리: 키 등급 연동 (木 재료 — 긴 팔다리)
+  const lmI=['매우작음','작음','보통','큼','매우큼'].indexOf(hV);
+  const lmL=['짧음','짧은편','보통','긴편','매우긺'][Math.max(0,lmI)];
+  parts.push({key:'limbs@'+lmL,label:'팔다리 ['+lmL+']',def:['short legs','','','long legs','very long legs, long limbs'][Math.max(0,lmI)]});
   return parts;
 }
 function slotVal(addr,key,def){
