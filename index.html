@@ -294,6 +294,8 @@ body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',sans-serif
   #nai-result{display:none!important;}   /* 데스크톱: 인라인 이미지 대신 우측 패널 사용 */
 }
 .nai-in{width:100%;box-sizing:border-box;background:#0a0b10;border:1px solid var(--bdr);border-radius:5px;color:var(--txt);font-size:10px;padding:4px 7px;font-family:monospace;}
+textarea.nai-in{resize:none;overflow:hidden;height:26px;min-height:26px;line-height:1.5;white-space:pre-wrap;word-break:break-all;display:block;transition:height .12s ease;scrollbar-width:thin;}
+textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6px rgba(212,168,67,.15);}
 .nai-opt{display:flex;flex-direction:column;gap:2px;font-size:8px;color:var(--dim);}
 .nai-opt select,.nai-opt input{background:#0a0b10;border:1px solid var(--bdr);border-radius:5px;color:var(--txt);font-size:10px;padding:4px 6px;}
 </style>
@@ -2953,7 +2955,7 @@ function slotRowEditor(key,def){
   const rName=(ETHNO[parts[0]]||RACE_APPEAR[parts[0]]||{name:parts[0]}).name;
   return '<div style="padding:6px 10px;margin:-1px 0 4px;background:#0a0b10;border:1px solid var(--bdr2);border-radius:8px;">'
     +'<div style="font-size:8px;color:var(--fnt);margin-bottom:3px;">슬롯 주소: '+rName+' '+(parts[1]==='f'?'♀':'♂')+' '+(TIER_KO[parts[2]]||parts[2])+' · 같은 주소의 모든 캐릭터에 적용 · 빈 칸=기본값 <span style="color:var(--dim);">'+esc(def||'(없음)')+'</span></div>'
-    +'<input class="nai-in" data-slot="'+key+'" value="'+esc(ov)+'" placeholder="'+esc(def||'')+'" oninput="slotEdited(\''+addr+'\',this)"></div>';
+    +'<textarea class="nai-in" rows="1" data-slot="'+key+'" placeholder="'+esc(def||'')+'" oninput="slotEdited(\''+addr+'\',this)">'+esc(ov)+'</textarea></div>';
 }
 function slotRow(label,val,key,def){
   return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;margin:3px 0;background:var(--card);border:1px solid var(--bdr);border-radius:8px;">'
@@ -2974,7 +2976,7 @@ function renderSlotEditor(d){
      {k:'outfit_nude_f',l:'나체 ♀'},{k:'outfit_nude_m',l:'나체 ♂'}].forEach(c=>{
       const cv=(naiSlots.common||{})[c.k]||'';
       h+='<div style="margin:5px 0;"><span style="font-size:9px;font-weight:600;">'+c.l+'</span>'
-        +'<input class="nai-in" value="'+esc(cv)+'" placeholder="'+esc(NAI_COMMON_DEF[c.k]||'')+'" oninput="commonEdited(\''+c.k+'\',this)"></div>';
+        +'<textarea class="nai-in" rows="1" placeholder="'+esc(NAI_COMMON_DEF[c.k]||'')+'" oninput="commonEdited(\''+c.k+'\',this)">'+esc(cv)+'</textarea></div>';
     });
   }
   sec.innerHTML=h;
@@ -3639,6 +3641,29 @@ function naiGalleryRender(){
   }
   box.innerHTML=h;
 }
+
+// ── 프롬프트 입력란 자동 확장 (포커스 시 전체 내용 표시 + 스크롤, 최대 240px) ──
+function naiTaGrow(el){
+  el.style.height='26px';
+  const h=Math.min(240,Math.max(26,el.scrollHeight+2));
+  el.style.height=h+'px';
+}
+document.addEventListener('focusin',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'&&t.classList.contains('nai-in'))naiTaGrow(t);
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'&&t.classList.contains('nai-in')&&document.activeElement===t)naiTaGrow(t);
+});
+document.addEventListener('focusout',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'&&t.classList.contains('nai-in')){t.style.height='26px';t.scrollTop=0;}
+});
+document.addEventListener('keydown',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'&&t.classList.contains('nai-in')&&e.key==='Enter'){e.preventDefault();t.blur();}
+});
 window.naiGalleryGet=function(){const a=naiOutputs.slice();a.cur=naiGalCur;return a;};
 window.naiGalShow=function(i){
   const o=naiOutputs[i];if(!o)return;
