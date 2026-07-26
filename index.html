@@ -1176,7 +1176,7 @@ const SS12T={fire:'亥子丑寅卯辰巳午未申酉戌',metal:'寅卯辰巳午�
 const SS12N=['물불 안 가림','위기관리','몽상가','길잡이','인싸 체질','파란만장','무대체질','장군감','철두철미','파견 전문','트러블 메이커','혼자가 좋아'];
 
 // 천을귀인 테이블
-const CHEONUL={甲:'丑未',乙:'子申',丙:'亥酉',丁:'亥酉',戊:'丑未',己:'子申',庚:'寅午',辛:'寅午',壬:'巳卯',癸:'巳卯'};
+const CHEONUL={甲:'丑未',乙:'子申',丙:'亥酉',丁:'亥酉',戊:'丑未',己:'子申',庚:'丑未',辛:'寅午',壬:'巳卯',癸:'巳卯'};
 // 문창귀인
 const MUNCHANG={甲:'巳',乙:'午',丙:'申',丁:'酉',戊:'申',己:'酉',庚:'亥',辛:'子',壬:'寅',癸:'卯'};
 // 양인살 (양간만)
@@ -1186,9 +1186,9 @@ const BIIN={甲:'酉',丙:'子',戊:'子',庚:'卯',壬:'午'};
 // 홍염살
 const HONGYEOM={甲:'午',乙:'申',丙:'寅',丁:'未',戊:'辰',己:'辰',庚:'戌',辛:'酉',壬:'子',癸:'申'};
 // 암록
-const AMROK={甲:'午',乙:'申',丙:'酉',丁:'亥',戊:'子',己:'寅',庚:'卯',辛:'巳',壬:'午',癸:'巳'};
+const AMROK={甲:'亥',乙:'戌',丙:'申',丁:'未',戊:'申',己:'未',庚:'巳',辛:'辰',壬:'寅',癸:'丑'};
 // 금여
-const GEUMYEO={甲:'辰',乙:'巳',丙:'未',丁:'申',戊:'酉',己:'戌',庚:'亥',辛:'子',壬:'丑',癸:'寅'};
+const GEUMYEO={甲:'辰',乙:'巳',丙:'未',丁:'申',戊:'未',己:'申',庚:'戌',辛:'亥',壬:'丑',癸:'寅'};
 // 건록
 const GEONROK={甲:'寅',乙:'卯',丙:'巳',丁:'午',戊:'巳',己:'午',庚:'申',辛:'酉',壬:'亥',癸:'子'};
 // 복성귀인
@@ -1200,17 +1200,17 @@ const HYEONCHIM='甲乙辛壬';
 // 괴강살 일주
 const GOEGANG=['庚辰','庚戌','壬辰','壬戌'];
 // 백호살 일주
-const BAEKHO=['甲辰','乙巳','丙申','丁酉','戊寅','己卯','庚午','辛未','壬戌','癸亥'];
+const BAEKHO=['甲辰','乙未','丙戌','丁丑','戊辰','壬戌','癸丑'];
 // 육수 일주
 const YUKSU=['丙午','丁未','戊子','己丑','庚寅','辛卯'];
 // 고란살 일주
-const GORAN=['乙巳','丁巳','辛亥','戊申','壬寅','戊午','壬子','丙午'];
+const GORAN=['甲寅','乙巳','丙午','丁巳','戊申','戊午','辛亥','壬子'];
 // 원진 짝
 const WONJIN=[['子','未'],['丑','午'],['寅','酉'],['卯','申'],['辰','亥'],['巳','戌']]; // 원진 정본 (자미·축오·인유·묘신·진해·사술)
 // 귀문관 짝 (인접기둥)
-const GWIMUN=[['寅','未'],['卯','辰'],['巳','戌'],['午','亥'],['酉','寅'],['子','未']];
+const GWIMUN=[['子','酉'],['丑','午'],['寅','未'],['卯','申'],['辰','亥'],['巳','戌']];
 // 삼기 천간 조합
-const SAMGI={천상:'甲戊庚',인중:'乙丙丁',지하:'辛壬癸'};
+const SAMGI={천상:'甲戊庚',지하:'乙丙丁',인중:'壬癸辛'};
 // 고신/과숙 (방합 기반)
 const GOSIN={亥:'寅',子:'寅',丑:'寅',寅:'巳',卯:'巳',辰:'巳',巳:'申',午:'申',未:'申',申:'亥',酉:'亥',戌:'亥'};
 const GWASUK={亥:'戌',子:'戌',丑:'戌',寅:'丑',卯:'丑',辰:'丑',巳:'辰',午:'辰',未:'辰',申:'未',酉:'未',戌:'未'};
@@ -3283,20 +3283,24 @@ function yearnVec(d){
   return v;
 }
 // 내 쪽(고정) 계산 캐시 — 후보 12만 명 스캔 시 매회 재계산 방지
-function compatCtx(a){
+function compatCtx(a,face){
   const pa=calcParams(a);
+  let va;
+  if(face==='jung')va=calcYearning(a,'jung').yearns;
+  else if(face==='jong')va=calcYearning(a,'jong').yearns;
+  else va=yearnVec(a);
   return {
-    a:a, va:yearnVec(a),
+    a:a, va:va, face:face||'auto',
     ja:a.p.map(x=>x.j.lk?-1:tidOfJ(x.j.tid)),
     ga:(a.p[1].g&&a.p[1].g.tid)?tidOfG(a.p[1].g.tid):-1,
     pa:pa, ha:(pa&&pa.total)?calcHParams(pa.counts,pa.total,a.el):null,
     aYj:calcYearning(a,'jung'), aJong:calcJongGyeok(a)
   };
 }
-function compatAxesWith(C,b){
+function compatAxesWith(C,b,jongBPre){
   const rp=[],rv=[];let sp=0,sv=0;
   // ═══ 신체/기질 축 (지지=몸/현장) ═══
-  const jongB=calcJongGyeok(b);
+  const jongB=jongBPre||calcJongGyeok(b);
   const yBj=calcYearning(b,'jung');
   const vb={};
   if(jongB.type==='dual'){
@@ -3384,9 +3388,11 @@ function compatAxes(a,b){return compatAxesWith(compatCtx(a),b);}
 window._csHelpers={CHUNG_J:CHUNG_J,YUKHAP_J:YUKHAP_J,isWonjin:isWonjin,inSamhap:inSamhap,isHyeong:isHyeong,compatCtx:compatCtx,compatAxesWith:compatAxesWith,tidOfJ:tidOfJ,elOf:elOf,cands:()=>csCands};
 let csCands=[];
 let _csGen=0;
-let csFilter={gdr:null,race:'human',stage:'any',open:0};
+let csFilter={gdr:null,race:'human',stage:'any',dual:'any',face:'auto',open:0};
 window.csSetRace=function(v){csFilter.race=v;showCompatSim(csFilter.gdr);};
 window.csSetStage=function(v){csFilter.stage=v;showCompatSim(csFilter.gdr);};
+window.csSetDual=function(v){csFilter.dual=v;showCompatSim(csFilter.gdr);};
+window.csSetFace=function(v){csFilter.face=v;showCompatSim(csFilter.gdr);};
 window.csToggleSec=function(i){
   const el=document.getElementById('cs-axbody-'+i);
   const ar=document.getElementById('cs-axarr-'+i);
@@ -3409,7 +3415,7 @@ window.showCompatSim=function(g){
 };
 async function runCompat(d,gdr,gen){
   try{
-    const C=compatCtx(d);
+    const C=compatCtx(d,csFilter.face);
     // ── 필터: 종족 × 연령대 → 스캔 생년 범위 ──
     const race=csFilter.race||'human';
     const R=RACES[race]||RACES.human;
@@ -3437,7 +3443,10 @@ async function runCompat(d,gdr,gen){
           for(let hr=0;hr<12;hr+=hrStep){
             const s=calcSajuFromDate(y,mo,dy,hr,'none');
             const cd={p:s.p,el:elOf(s.p),gender:gdr};
-            const ax=compatAxesWith(C,cd);
+            const jongB=calcJongGyeok(cd);
+            if(csFilter.dual==='dual'&&jongB.type!=='dual')continue;
+            if(csFilter.dual==='single'&&jongB.type==='dual')continue;
+            const ax=compatAxesWith(C,cd,jongB);
             scanned++;
             for(let ai=0;ai<3;ai++){
               const k=AXK[ai],v=ax[k];
@@ -3491,12 +3500,14 @@ async function runCompat(d,gdr,gen){
     const stageOpts=[['any','전체 연령'],['youth','초년기'],['middle','중년기'],['elder','말년기']];
     const stageNote=stg==='any'?'':' · '+({youth:'초년기',middle:'중년기',elder:'말년기'})[stg];
     let h=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div>
-    <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · ${(RACES[race]||{}).name||race}${stageNote} ${loA}~${hiA}세 · ${scanned.toLocaleString()}명 전수 스캔 (${elapsed}초${hrStep>1?' · 시주 2간격':''}) — 결정론</div>
+    <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · ${(RACES[race]||{}).name||race}${stageNote} ${loA}~${hiA}세 · ${scanned.toLocaleString()}명 전수 스캔 (${elapsed}초${hrStep>1?' · 시주 2간격':''})${csFilter.dual==='dual'?' · 이중 명식만':csFilter.dual==='single'?' · 순수 명식만':''}${C.face==='jung'?' · 내 정면 기준':C.face==='jong'?' · 내 종면 기준':''} — 결정론</div>
     <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
       <button class="xm-btn ${gdr==='m'?'pri':''}" onclick="showCompatSim('m')">상대 ♂</button>
       <button class="xm-btn ${gdr==='f'?'pri':''}" onclick="showCompatSim('f')">상대 ♀</button>
       <select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetRace(this.value)">${raceOpts.map(o=>`<option value="${o[0]}"${race===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>
       <select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetStage(this.value)">${stageOpts.map(o=>`<option value="${o[0]}"${stg===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>
+      <select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetDual(this.value)">${[['any','명식 전체'],['single','순수 명식'],['dual','이중 명식(종격)']].map(o=>`<option value="${o[0]}"${(csFilter.dual||'any')===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>
+      ${calcJongGyeok(d).type==='dual'?`<select class="ce-sel" style="width:auto;padding:6px 8px;" onchange="csSetFace(this.value)">${[['auto','내 기준: 혼합'],['jung','내 기준: 정면'],['jong','내 기준: 종면(그림자)']].map(o=>`<option value="${o[0]}"${(csFilter.face||'auto')===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select>`:''}
     </div>`;
     axes.forEach((A,ai)=>{
       const pct=v=>Math.round((v-mn[A.k])/(mx[A.k]-mn[A.k]||1)*100);
