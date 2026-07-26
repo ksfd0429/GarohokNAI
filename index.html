@@ -1206,7 +1206,7 @@ const YUKSU=['丙午','丁未','戊子','己丑','庚寅','辛卯'];
 // 고란살 일주
 const GORAN=['乙巳','丁巳','辛亥','戊申','壬寅','戊午','壬子','丙午'];
 // 원진 짝
-const WONJIN=[['子','未'],['丑','午'],['寅','巳'],['卯','辰'],['申','亥'],['酉','戌']];
+const WONJIN=[['子','未'],['丑','午'],['寅','酉'],['卯','申'],['辰','亥'],['巳','戌']]; // 원진 정본 (자미·축오·인유·묘신·진해·사술)
 // 귀문관 짝 (인접기둥)
 const GWIMUN=[['寅','未'],['卯','辰'],['巳','戌'],['午','亥'],['酉','寅'],['子','未']];
 // 삼기 천간 조합
@@ -3215,7 +3215,7 @@ window.ceSave=function(){
   setMode('player');
 };
 
-// ═══ 2. 궁합 시뮬레이션 엔진 ═══
+// ═══ 2. 궁합 시뮬레이션 엔진 (결정론 전수 스캔) ═══
 function yearnVec(d){
   const jong=calcJongGyeok(d);
   const yJ=calcYearning(d,'jung').yearns;
@@ -3226,15 +3226,33 @@ function yearnVec(d){
   } else ELS.forEach(e=>v[e]=yJ[e]);
   return v;
 }
-function compatAxes(a,b){
+// 내 쪽(고정) 계산 캐시 — 후보 12만 명 스캔 시 매회 재계산 방지
+function compatCtx(a){
+  const pa=calcParams(a);
+  return {
+    a:a, va:yearnVec(a),
+    ja:a.p.map(x=>x.j.lk?-1:tidOfJ(x.j.tid)),
+    ga:(a.p[1].g&&a.p[1].g.tid)?tidOfG(a.p[1].g.tid):-1,
+    pa:pa, ha:(pa&&pa.total)?calcHParams(pa.counts,pa.total,a.el):null,
+    aYj:calcYearning(a,'jung'), aJong:calcJongGyeok(a)
+  };
+}
+function compatAxesWith(C,b){
   const rp=[],rv=[];let sp=0,sv=0;
   // ═══ 신체/기질 축 (지지=몸/현장) ═══
-  const va=yearnVec(a),vb=yearnVec(b);
+  const jongB=calcJongGyeok(b);
+  const yBj=calcYearning(b,'jung');
+  const vb={};
+  if(jongB.type==='dual'){
+    const yG=calcYearning(b,'jong').yearns;
+    ELS.forEach(e=>{vb[e]=yBj.yearns[e]*(jongB.jungPct/100)+yG[e]*(jongB.jongPct/100);});
+  } else ELS.forEach(e=>{vb[e]=yBj.yearns[e];});
+  const va=C.va;
   let m1=0,m2=0;
-  ELS.forEach(e=>{m1+=va[e]*(b.el[e]||0)/100;m2+=vb[e]*(a.el[e]||0)/100;});
+  ELS.forEach(e=>{m1+=va[e]*(b.el[e]||0)/100;m2+=vb[e]*(C.a.el[e]||0)/100;});
   sp+=(m1+m2)*0.45;
   if(m1>28)rp.push('내 본능 끌림↑');if(m2>28)rp.push('상대 본능 끌림↑');
-  const ja=a.p.map(x=>x.j.lk?-1:tidOfJ(x.j.tid)),jb=b.p.map(x=>x.j.lk?-1:tidOfJ(x.j.tid));
+  const ja=C.ja,jb=b.p.map(x=>x.j.lk?-1:tidOfJ(x.j.tid));
   if(ja[1]>=0&&jb[1]>=0){
     if(YUKHAP_J(ja[1],jb[1])){sp+=14;rp.push('배우자궁 육합');}
     if(inSamhap(ja[1],jb[1])){sp+=8;rp.push('배우자궁 삼합');}
@@ -3250,9 +3268,10 @@ function compatAxes(a,b){
   sp+=Math.min(xBon,8)-Math.min(xPen,12);
   if(xPen>=6)rp.push('지지 충극 다수');else if(xBon>=5)rp.push('지지 합 다수');
   // 성행위 기질 상보/충돌 (지배·가학=상보 유리, 정조·독점·내성=유사 유리)
-  const pa=calcParams(a),pb=calcParams(b);
+  const pa=C.pa,pb=calcParams(b);
+  let hb=null;
   if(pa&&pb&&pa.total&&pb.total){
-    const ha=calcHParams(pa.counts,pa.total,a.el),hb=calcHParams(pb.counts,pb.total,b.el);
+    const ha=C.ha;hb=calcHParams(pb.counts,pb.total,b.el);
     const dSub=Math.abs(ha.submit-hb.submit),dSad=Math.abs(ha.sadism-hb.sadism);
     sp+=(dSub-3)*2+(dSad-3)*1.6;
     if(dSub>=4)rp.push('🔗지배↔순응 맞물림');
@@ -3262,24 +3281,30 @@ function compatAxes(a,b){
     if(dCh>=4)rp.push('⚡정조관념 충돌');
     if(dPo>=4)rp.push('⚡독점↔개방 충돌');
   }
-  const ga=tidOfG(a.p[1].g.tid),gb=tidOfG(b.p[1].g.tid);
+  const ga=C.ga,gb=tidOfG(b.p[1].g.tid);
   if(ga>=0&&gb>=0&&ga%2!==gb%2){sp+=4;rp.push('음양 극성 조화');}
   // ═══ 지향/성격 축 (천간=정신/지향 · 사회궁) ═══
   if(ga>=0&&gb>=0){
-    const r=rel(a.p[1].g.e,b.p[1].g.e);
+    const r=rel(C.a.p[1].g.e,b.p[1].g.e);
     if(r==='gen'||r==='drain'){sv+=9;rv.push('일간 상생');}
     else if(r==='same'){sv+=5;rv.push('일간 동기(同氣)');}
     else if(r==='ovr'||r==='ctr'){sv-=6;rv.push('일간 상극');}
     if(Math.abs(ga-gb)===5){
-      const sides=[a,b];let trapped=false,shadowFit=false;
-      sides.forEach(d0=>{
-        const trap=calcYearning(d0,'jung').trapEl;
-        if(!trap)return;
+      let trapped=false,shadowFit=false;
+      // a측 (캐시)
+      if(C.aYj.trapEl){
         trapped=true;
-        const jg=calcJongGyeok(d0);
+        const jg=C.aJong;
         sv-=12*((jg.type==='dual'?jg.jungPct:100)/100);
-        if(jg.type==='dual'&&jg.jongEl===trap){sv+=10*(jg.jongPct/100);shadowFit=true;}
-      });
+        if(jg.type==='dual'&&jg.jongEl===C.aYj.trapEl){sv+=10*(jg.jongPct/100);shadowFit=true;}
+      }
+      // b측
+      if(yBj.trapEl){
+        trapped=true;
+        const jg=jongB;
+        sv-=12*((jg.type==='dual'?jg.jungPct:100)/100);
+        if(jg.type==='dual'&&jg.jongEl===yBj.trapEl){sv+=10*(jg.jongPct/100);shadowFit=true;}
+      }
       if(trapped){rv.push(shadowFit?'⚠️합 함정 · 💫그림자 완성':'⚠️일간합 함정');}
       else{sv+=18;rv.push('💍일간 천간합');}
     }
@@ -3299,53 +3324,111 @@ function compatAxes(a,b){
   }
   return{phys:sp,val:sv,total:sp+sv,rp,rv};
 }
+function compatAxes(a,b){return compatAxesWith(compatCtx(a),b);}
+window._csHelpers={CHUNG_J:CHUNG_J,YUKHAP_J:YUKHAP_J,isWonjin:isWonjin,inSamhap:inSamhap,isHyeong:isHyeong,compatCtx:compatCtx,compatAxesWith:compatAxesWith,tidOfJ:tidOfJ,elOf:elOf,cands:()=>csCands};
 let csCands=[];
+let _csRunning=false;
 window.showCompatSim=function(g){
   const d=currentData;
   if(!d||!d.p||!d.p[1].g||!d.p[1].g.e){alert('일간이 지정된 원국이 필요합니다. ✍️ 내 원국에서 최소 일주를 지정하세요.');return;}
+  if(_csRunning)return;
   const gdr=g||((d.gender||'m')==='m'?'f':'m');
   const m=document.getElementById('compat-modal');
   m.classList.add('on');
-  m.innerHTML=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div><div class="xm-sub">오르비아력 실존 가능 원국 3,000명 스캔 중…</div></div>`;
+  m.innerHTML=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div><div class="xm-sub" id="cs-prog">오르비아력 성인 전 원국 전수 스캔 준비 중…</div></div>`;
   setTimeout(()=>runCompat(d,gdr),30);
 };
-function runCompat(d,gdr){
-  csCands=[];
-  for(let i=0;i<3000;i++){
-    const age=18+Math.floor(Math.random()*28);
-    const y=ORVIA_YEAR-age,mo=1+Math.floor(Math.random()*12);
-    const dy=1+Math.floor(Math.random()*dimOf(y,mo)),hr=Math.floor(Math.random()*12);
-    const s=calcSajuFromDate(y,mo,dy,hr,'none');// 바이어스 우회 → 60갑자 정합 보장
-    const cd={p:s.p,el:elOf(s.p),gender:gdr};
-    const ax=compatAxes(d,cd);
-    csCands.push({saju:s,cd:cd,age:age,idx:i,ax:ax});
-  }
-  const axes=[
-    {k:'phys',rk:'rp',icon:'🫦',name:(d.gender||'m')!==gdr?'신체·기질 궁합 (속궁합)':'신체·기질 궁합'},
-    {k:'val',rk:'rv',icon:'🧭',name:'지향·성격 궁합'},
-    {k:'total',rk:null,icon:'💍',name:'종합 궁합'}
-  ];
-  let h=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div>
-  <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · 3,000명 스캔 완료</div>
-  <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;">
-    <button class="xm-btn ${gdr==='m'?'pri':''}" onclick="showCompatSim('m')">상대 ♂</button>
-    <button class="xm-btn ${gdr==='f'?'pri':''}" onclick="showCompatSim('f')">상대 ♀</button>
-  </div>`;
-  axes.forEach(A=>{
-    const sorted=[...csCands].sort((x,y)=>y.ax[A.k]-x.ax[A.k]);
-    const mn=sorted[sorted.length-1].ax[A.k],mx=sorted[0].ax[A.k];
-    const pct=v=>Math.round((v-mn)/(mx-mn||1)*100);
-    const uniq=arr=>{const seen={},out=[];for(const c of arr){const key=chartStr(c.saju.p);if(seen[key])continue;seen[key]=1;out.push(c);if(out.length===3)break;}return out;};
-    const top=uniq(sorted),bot=uniq([...sorted].reverse());
-    const rsOf=c=>A.rk?c.ax[A.rk]:[...c.ax.rp,...c.ax.rv];
-    const row=(c,cls)=>`<div class="cs-row ${cls}">${chartMini(c.saju.p)}<div style="flex:1;min-width:0;"><div class="cs-rsn">${rsOf(c).join(' · ')||'무난한 흐름'}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><div class="cs-score" style="width:auto;color:${cls==='best1'?'#5cb87a':cls==='worst1'?'#c44536':'var(--txt)'}">${pct(c.ax[A.k])}</div><button class="cs-load" onclick="csSpawn(${c.idx})">시뮬 →</button></div></div>`;
-    h+=`<div class="cs-sec" style="color:var(--gold);border-top:1px solid var(--bdr);padding-top:12px;margin-top:14px;font-size:11px;">${A.icon} ${A.name}</div>`;
-    h+=`<div class="cs-sec" style="color:#5cb87a;">찰떡 TOP</div>`+top.map((c,i)=>row(c,i===0?'best1':'')).join('');
-    h+=`<div class="cs-sec" style="color:#c44536;">최악 TOP</div>`+bot.map((c,i)=>row(c,i===0?'worst1':'')).join('');
-  });
-  h+=`<div class="xm-btnrow"><button class="xm-btn" onclick="document.getElementById('compat-modal').classList.remove('on')">닫기</button></div></div>`;
-  document.getElementById('compat-modal').innerHTML=h;
-  window._lastCompatHTML=h;
+async function runCompat(d,gdr){
+  _csRunning=true;
+  try{
+    const C=compatCtx(d);
+    const Y1=ORVIA_YEAR-18,Y0=ORVIA_YEAR-45;   // 성인 18~45세 전 생년
+    const AXK=['phys','val','total'];
+    const KEEP=3;
+    const best={},worst={},mn={},mx={};
+    AXK.forEach(k=>{best[k]=[];worst[k]=[];mn[k]=Infinity;mx[k]=-Infinity;});
+    let scanned=0;
+    const t0=Date.now();
+    let hrStep=1;   // 시주 전수(12시진). 느린 기기면 첫 해 측정 후 2로 자동 완화
+    const yearsTotal=Y1-Y0+1;
+    for(let y=Y0;y<=Y1;y++){
+      for(let mo=1;mo<=12;mo++){
+        const dim=dimOf(y,mo);
+        for(let dy=1;dy<=dim;dy++){
+          for(let hr=0;hr<12;hr+=hrStep){
+            const s=calcSajuFromDate(y,mo,dy,hr,'none');   // 60갑자 정합 실존 원국
+            const cd={p:s.p,el:elOf(s.p),gender:gdr};
+            const ax=compatAxesWith(C,cd);
+            scanned++;
+            for(let ai=0;ai<3;ai++){
+              const k=AXK[ai],v=ax[k];
+              if(v<mn[k])mn[k]=v;
+              if(v>mx[k])mx[k]=v;
+              const B=best[k];
+              if(B.length<KEEP||v>B[B.length-1].s){
+                B.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,ax:ax}});
+                B.sort((p,q)=>q.s-p.s);
+                if(B.length>KEEP)B.length=KEEP;
+              }
+              const W=worst[k];
+              if(W.length<KEEP||v<W[W.length-1].s){
+                W.push({s:v,c:{saju:s,cd:cd,age:ORVIA_YEAR-y,ax:ax}});
+                W.sort((p,q)=>p.s-q.s);
+                if(W.length>KEEP)W.length=KEEP;
+              }
+            }
+          }
+        }
+      }
+      // 진행률 + 양보 (매 해)
+      const done=y-Y0+1;
+      const prog=document.getElementById('cs-prog');
+      if(prog)prog.textContent='전수 스캔 중… '+Math.round(done/yearsTotal*100)+'% ('+scanned.toLocaleString()+'명)';
+      // 첫 해 측정 후 저속 기기 자동 완화 (전체 예상 45초 초과 시 시주 2간격)
+      if(done===1){
+        const proj=(Date.now()-t0)*yearsTotal;
+        if(proj>45000)hrStep=2;
+      }
+      await new Promise(r=>setTimeout(r,0));
+      if(!document.getElementById('cs-prog')){_csRunning=false;return;}   // 모달 닫힘 → 중단
+    }
+    const elapsed=((Date.now()-t0)/1000).toFixed(1);
+    // 표시용 후보 수집 (idx 부여)
+    csCands=[];
+    const seen=new Map();
+    const reg=c=>{
+      const key=chartStr(c.saju.p);
+      if(seen.has(key))return seen.get(key);
+      const idx=csCands.length;
+      c.idx=idx;csCands.push(c);seen.set(key,idx);
+      return idx;
+    };
+    const axes=[
+      {k:'phys',rk:'rp',icon:'🫦',name:(d.gender||'m')!==gdr?'신체·기질 궁합 (속궁합)':'신체·기질 궁합'},
+      {k:'val',rk:'rv',icon:'🧭',name:'지향·성격 궁합'},
+      {k:'total',rk:null,icon:'💍',name:'종합 궁합'}
+    ];
+    let h=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div>
+    <div class="xm-sub">기준: ${d.firstname||d.name||'현재 캐릭터'} (${d.p[1].g.tid}일간) · 성인 전 원국 ${scanned.toLocaleString()}명 전수 스캔 (${elapsed}초${hrStep>1?' · 시주 2간격':''}) — 같은 원국이면 결과 항상 동일</div>
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px;">
+      <button class="xm-btn ${gdr==='m'?'pri':''}" onclick="showCompatSim('m')">상대 ♂</button>
+      <button class="xm-btn ${gdr==='f'?'pri':''}" onclick="showCompatSim('f')">상대 ♀</button>
+    </div>`;
+    axes.forEach(A=>{
+      const pct=v=>Math.round((v-mn[A.k])/(mx[A.k]-mn[A.k]||1)*100);
+      const rsOf=c=>A.rk?c.ax[A.rk]:[...c.ax.rp,...c.ax.rv];
+      const row=(e,cls)=>{
+        const c=e.c;const idx=reg(c);
+        return `<div class="cs-row ${cls}">${chartMini(c.saju.p)}<div style="flex:1;min-width:0;"><div class="cs-rsn">${rsOf(c).join(' · ')||'무난한 흐름'}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><div class="cs-score" style="width:auto;color:${cls==='best1'?'#5cb87a':cls==='worst1'?'#c44536':'var(--txt)'}">${pct(c.ax[A.k])}</div><button class="cs-load" onclick="csSpawn(${idx})">시뮬 →</button></div></div>`;
+      };
+      h+=`<div class="cs-sec" style="color:var(--gold);border-top:1px solid var(--bdr);padding-top:12px;margin-top:14px;font-size:11px;">${A.icon} ${A.name}</div>`;
+      h+=`<div class="cs-sec" style="color:#5cb87a;">찰떡 TOP</div>`+best[A.k].map((e,i)=>row(e,i===0?'best1':'')).join('');
+      h+=`<div class="cs-sec" style="color:#c44536;">최악 TOP</div>`+worst[A.k].map((e,i)=>row(e,i===0?'worst1':'')).join('');
+    });
+    h+=`<div class="xm-btnrow"><button class="xm-btn" onclick="document.getElementById('compat-modal').classList.remove('on')">닫기</button></div></div>`;
+    document.getElementById('compat-modal').innerHTML=h;
+    window._lastCompatHTML=h;
+  }finally{_csRunning=false;}
 }
 window.csSpawn=function(idx){
   const c=csCands.find(x=>x.idx===idx);if(!c)return;
