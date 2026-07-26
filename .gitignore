@@ -1,0 +1,4 @@
+# API 키·개인 데이터는 절대 커밋 금지
+nai_key.txt
+output/
+slots.json
