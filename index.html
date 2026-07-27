@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v14.7 + NAI</title>
+<title>가호록 v14.9 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -406,6 +406,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
 </div>
 </div>
 <div id="design-modal"></div>
+<div id="agecfg-modal"></div>
 <script>
 const GEN={wood:'fire',fire:'earth',earth:'metal',metal:'water',water:'wood'};
 const OVR={wood:'earth',fire:'metal',earth:'water',metal:'wood',water:'fire'};
@@ -643,7 +644,7 @@ function generateSynopsis(d){
   sec.innerHTML=sentences.join(' ');
 }
 
-function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+d.info+'</div>';document.getElementById('cs').textContent=d.sub||'';document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
+function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+charInfoLine(d)+'</div>';document.getElementById('cs').textContent=charSubLine(d);document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
 
 function buildTable(d){
   const rg=document.getElementById('rg'),rj=document.getElementById('rj');rg.innerHTML='';rj.innerHTML='';
@@ -760,7 +761,16 @@ const SURNAMES_DELF=['모르간딜','우르쿠론','나르실론','드렝곤딜'
 
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 // === ORVIA CALENDAR & SAJU ENGINE ===
-const ORVIA_YEAR=1219;
+const ORVIA_YEAR_DEF=1219;
+// 기준 연도 = "지금이 오르비아 몇 년인가". 글로벌 설정 · 사용자가 자유롭게 조정한다.
+//   나이는 어디에도 고정 저장하지 않는다 — 항상 (기준 연도 − 고정 생년)으로 그 자리에서 계산한다.
+//   따라서 기준 연도를 바꾸면 이미 만들어진 인물 전원의 나이가 함께 움직인다.
+let ORVIA_YEAR=ORVIA_YEAR_DEF;
+function orviaYearClamp(y){const n=Math.round(Number(y));if(!isFinite(n))return ORVIA_YEAR_DEF;return Math.max(1,Math.min(999999,n));}
+function orviaYearSync(){try{const b=(naiSlots&&naiSlots.baseYear);ORVIA_YEAR=(b!=null&&isFinite(Number(b)))?orviaYearClamp(b):ORVIA_YEAR_DEF;}catch(e){ORVIA_YEAR=ORVIA_YEAR_DEF;}return ORVIA_YEAR;}
+function orviaYearSet(y){ORVIA_YEAR=orviaYearClamp(y);try{naiSlots.baseYear=ORVIA_YEAR;naiSaveSlots();}catch(e){}return ORVIA_YEAR;}
+// 60갑자 index ← (천간 idx, 지지 idx). 간지 정합(동일 홀짝)이 아니면 -1
+function ganjiIdx(g,j){if(((g-j)%2+2)%2!==0)return -1;for(let i=0;i<60;i++)if(i%10===g&&i%12===j)return i;return -1;}
 const GANS_ALL=[GANS_Y[0],GANS_N[0],GANS_Y[1],GANS_N[1],GANS_Y[2],GANS_N[2],GANS_Y[3],GANS_N[3],GANS_Y[4],GANS_N[4]];
 const JIS_ALL=[JIS_Y[0],JIS_N[0],JIS_Y[1],JIS_N[1],JIS_Y[2],JIS_N[2],JIS_Y[3],JIS_N[3],JIS_Y[4],JIS_N[4],JIS_Y[5],JIS_N[5]];
 // 오행→간지 매핑 (바이어스 시스템용)
@@ -808,25 +818,101 @@ const AGE_STAGES={
   ogre:[60,130]       // 수명 ~180
 };
 const STAGE_KO={youth:'초년기',middle:'중년기',elder:'말년기'};
+// ═══ 연령대 밴드 (종족별 · 남녀 공통 · 사용자 편집) ═══
+//   밴드 = {id,label,from} · from = 실나이 하한(포함) · 다음 밴드의 from 직전까지가 그 구간
+//   구간 1개 = 프리셋 2칸 (age_{id}_m / age_{id}_f) — 구간을 추가하면 프리셋 칸도 함께 생긴다
+//   ※ 첫 구간 하한은 종족 성인 하한(RACES[sp].minAge = 외견 18세 상당)에 고정된다.
+//     성인 앵커는 설계 불변식이므로 그 아래로 내려가는 구간은 만들 수 없다.
+const AGE_BAND_KO={youth:'초년',middle:'중년',elder:'노년'};
+function ageAdultFloor(sp){return (RACES[sp]&&RACES[sp].minAge)||18;}
+function ageBandsDefault(sp){
+  const bd=AGE_STAGES[sp]||AGE_STAGES.human;
+  return[{id:'youth',label:AGE_BAND_KO.youth,from:ageAdultFloor(sp)},
+         {id:'middle',label:AGE_BAND_KO.middle,from:bd[0]},
+         {id:'elder',label:AGE_BAND_KO.elder,from:bd[1]}];
+}
+// keepOrder=true → 사용자가 짠 배열 순서를 건드리지 않는다 (수동 배열 모드).
+//   자동 정렬/자동 간격 보정은 기본 시드(초기 3구간)를 만들 때만 쓴다.
+//   성인 하한만은 어느 모드에서도 강제된다 — 미성년 구간은 만들 수 없다.
+function ageBandsSanitize(sp,arr,keepOrder){
+  const fl=ageAdultFloor(sp),seen={};
+  let out=(Array.isArray(arr)?arr:[]).map(function(b){
+    return{id:String((b&&b.id)||'').replace(/[^A-Za-z0-9_]/g,'')||'band',
+           label:String((b&&b.label)||'').slice(0,14)||'구간',
+           from:Math.max(fl,Math.round(Number(b&&b.from)||fl))};
+  }).filter(function(b){if(seen[b.id])return false;seen[b.id]=1;return true;});
+  if(!out.length)out=ageBandsDefault(sp);
+  if(!keepOrder){
+    out.sort(function(a,b){return a.from-b.from;});
+    for(let i=1;i<out.length;i++)if(out[i].from<=out[i-1].from)out[i].from=out[i-1].from+1;
+  }
+  out[0].from=fl;                                   // 첫 구간 = 성인 하한 고정
+  return out;
+}
+// 배열이 오름차순인지 (수동 배열에서 경고 표시용 — 고쳐주지는 않는다)
+function ageBandsAscending(bs){for(let i=1;i<bs.length;i++)if(bs[i].from<=bs[i-1].from)return false;return true;}
+function ageBandsCustom(sp){try{return(naiSlots&&naiSlots.ageBands&&naiSlots.ageBands[sp]&&naiSlots.ageBands[sp].length)?naiSlots.ageBands[sp]:null;}catch(e){return null;}}
+function ageBands(sp){const c=ageBandsCustom(sp);return c?ageBandsSanitize(sp,c,true):ageBandsDefault(sp);}
+// 구간 범위는 "배열 순서" 그대로 읽는다 — i번 구간은 i+1번 구간의 시작 직전까지, 마지막은 개방
+function ageBandRange(bs,i){return{from:bs[i].from,to:(i+1<bs.length?bs[i+1].from-1:null)};}
+function ageBandOf(sp,age){
+  const bs=ageBands(sp);
+  for(let i=0;i<bs.length;i++){
+    const r=ageBandRange(bs,i);
+    if(age>=r.from&&(r.to==null||age<=r.to))return{i:i,band:bs[i],from:r.from,to:r.to,bands:bs};
+  }
+  // 어느 구간에도 안 들어감 (수동 배열이 비단조이거나 나이가 첫 구간 아래) → 시작나이가 가장 가까운 구간
+  let bi=0,bd=Infinity;
+  bs.forEach(function(b,i){const dd=Math.abs(age-b.from);if(dd<bd){bd=dd;bi=i;}});
+  const r=ageBandRange(bs,bi);
+  return{i:bi,band:bs[bi],from:r.from,to:r.to,bands:bs};
+}
+// 사용자 구간 → 기본 NAI 태그 계보(초년/중년/노년) 역산
+function ageBandBase(sp,from){const bd=AGE_STAGES[sp]||AGE_STAGES.human;return from<bd[0]?'youth':(from<bd[1]?'middle':'elder');}
+// 3분법 UI(설계 모달·궁합 필터)용 경계 — 사용자가 구간을 고치면 그대로 따라간다
+function ageStageBounds(sp){
+  const bs=ageBands(sp),d=AGE_STAGES[sp]||AGE_STAGES.human;
+  if(bs.length<2)return[d[0],d[1]];
+  return[bs[1].from,bs[bs.length-1].from];
+}
+// 구간 범위 표기 — 마지막 구간은 상한이 없으므로 '70세~'
+function ageRangeKo(from,to){return (to==null)?(from+'세~'):((to<from)?(from+'세~ 빈 구간'):(from+'~'+to+'세'));}
+function ageBandNewId(bs){let n=1;while(bs.some(function(b){return b.id==='band'+n;}))n++;return'band'+n;}
 function calcAgeStage(d){
   const sp=(d&&d.race&&d.race!=='human'&&RACES[d.race])?d.race:'human';
   const bd=AGE_STAGES[sp]||AGE_STAGES.human;
   const ar=(RACES[sp]&&RACES[sp].ageRatio)||1;
+  const bs=ageBands(sp);
   let age=null;
   if(d&&d.birth&&d.birth.year)age=ORVIA_YEAR-d.birth.year;
   else if(d&&d.appAge!=null&&isFinite(d.appAge))age=Math.round(d.appAge/ar);
-  if(age==null||!isFinite(age)||age<0)return{stage:'middle',label:STAGE_KO.middle,age:null,appAge:null,unknown:true,bounds:bd,sp:sp};
-  const stage=age<bd[0]?'youth':(age<bd[1]?'middle':'elder');
-  return{stage:stage,label:STAGE_KO[stage],age:age,appAge:(d.appAge!=null?d.appAge:Math.floor(age*ar)),unknown:false,bounds:bd,sp:sp};
+  // 인물별 연령대 수동 지정 — 나이 판정을 무시하고 이 구간으로 고정한다
+  let pin=-1;
+  if(d&&d.ageBandPin)for(let k=0;k<bs.length;k++)if(bs[k].id===d.ageBandPin)pin=k;
+  if(age==null||!isFinite(age)||age<0){
+    const ui=(pin>=0)?pin:Math.min(1,bs.length-1),ub=bs[ui],ur=ageBandRange(bs,ui);
+    return{stage:ub.id,label:ub.label,band:ub,bandFrom:ur.from,bandTo:ur.to,bands:bs,age:null,appAge:null,unknown:true,pinned:pin>=0,bounds:bd,sp:sp};
+  }
+  const r=ageBandOf(sp,age);
+  const bi=(pin>=0)?pin:r.i,bb=bs[bi],br=ageBandRange(bs,bi);
+  return{stage:bb.id,label:bb.label,band:bb,bandFrom:br.from,bandTo:br.to,bands:bs,age:age,appAge:Math.floor(age*ar),unknown:false,pinned:pin>=0,bounds:bd,sp:sp};
 }
-// 연령대 프리셋 라벨 (성별 분화) — 초년/중년/노년 × 남성/여성 = 6종
-const AGE_SEX_KO={youth:'초년',middle:'중년',elder:'노년'};
-function ageSexLabel(stage,gdr){return (AGE_SEX_KO[stage]||'중년')+' '+(gdr==='f'?'여성':'남성');}
+// 연령대 프리셋 라벨 (성별 분화) — 구간 라벨 × 남성/여성
+//   ageSexLabel(구간id|calcAgeStage결과, 성별) — 사용자가 구간 이름을 바꾸면 라벨만 따라가고 키는 그대로다
+const AGE_SEX_KO=AGE_BAND_KO;
+function ageSexLabel(stage,gdr){
+  const s=(stage&&typeof stage==='object')?(stage.label||'중년'):(AGE_SEX_KO[stage]||stage||'중년');
+  return s+' '+(gdr==='f'?'여성':'남성');
+}
 // 스테이지별 기본 NAI 태그 — 성인 앵커 고정 (초년기=young adult), 장수종은 말년도 노화 대신 초월적 분위기
 // ※ 성인 앵커는 설계 불변식이다. 초년기 아래 단계를 신설하지 않는다.
 function ageStageDefault(sp,stage,gdr){
   const longLived=(sp==='elf'||sp==='darkelf');
   const f=(gdr==='f');
+  if(stage!=='youth'&&stage!=='middle'&&stage!=='elder'){   // 사용자 신설 구간 → 위치로 계보 역산
+    const _b=ageBands(sp).filter(function(x){return x.id===stage;})[0];
+    stage=_b?ageBandBase(sp,_b.from):'middle';
+  }
   if(stage==='youth')return f?'young adult, youthful face':'young adult, youthful face';
   if(stage==='elder'){
     if(longLived)return f?'ageless beauty, ancient aura, otherworldly elegance':'ageless, ancient aura, otherworldly elegance';
@@ -843,7 +929,7 @@ function absDay(y,m,d){
   for(let i=0;i<m-1;i++) days+=md[i];
   return days+d;
 }
-function calcSajuFromDate(year,month,day,hour,race){
+function calcSajuFromDate(year,month,day,hour,race,keepYear){
   const raceData=RACES[race||'human']||RACES.human;
   // 년주: year1=갑자 → (year-1)%60
   const yIdx=(year-1)%60;
@@ -864,10 +950,13 @@ function calcSajuFromDate(year,month,day,hour,race){
   let rElem=raceData.element;
   if(!rElem&&(race==='human'||!race)) rElem=GAN_ELEMS[yGanIdx];// 인간: 연간 오행=하위종족
   if(rElem){
-    // 연간 바이어스 (이종족만)
-    if(raceData.element) yGanIdx=applyElemBias(yGanIdx,rElem,raceData.yearBias,'gan');
-    // 연지 바이어스
-    yJiIdx=applyElemBias(yJiIdx,rElem,raceData.yearBias,'ji');
+    // 연간/연지 바이어스 (이종족만)
+    // ※ keepYear면 년주 바이어스를 걸지 않는다 — 년주가 실제 생년의 60갑자와 어긋나면 안 되기 때문.
+    //    종족 오행 편향은 pickBirthYear()가 "생년 자체를 고르는" 방식으로 대신 만든다.
+    if(!keepYear){
+      if(raceData.element) yGanIdx=applyElemBias(yGanIdx,rElem,raceData.yearBias,'gan');
+      yJiIdx=applyElemBias(yJiIdx,rElem,raceData.yearBias,'ji');
+    }
     // 월간 바이어스
     mGanIdx=applyElemBias(mGanIdx,rElem,raceData.monthBias,'gan');
     // 월지 바이어스
@@ -885,6 +974,57 @@ function calcSajuFromDate(year,month,day,hour,race){
   };
 }
 
+// ═══ 고정 생년 선택 — 원국(년주)과 절대 모순되지 않는 생년 ═══
+//   기존 방식: 나이를 굴린다 → 생년을 역산 → 종족 바이어스가 년주를 덮어씀 → 생년과 년주가 어긋남.
+//   새 방식  : 연령 범위 안의 실제 60갑자 후보를 전부 세운다 → 종족 오행 가중치로 생년을 고른다
+//              → calcSajuFromDate(...,keepYear=true)로 그 해의 진짜 년주를 그대로 쓴다.
+//   결과     : 생년은 인물에 고정 저장되고, 년주는 언제나 그 생년의 60갑자다.
+function pickBirthYear(race,loAge,hiAge){
+  const R=RACES[race]||RACES.human;
+  const lo=Math.max(1,Math.round(loAge)),hi=Math.max(lo,Math.round(hiAge));
+  const rElem=R.element||null,bias=R.yearBias||0;
+  const cands=[];let tot=0;
+  for(let a=lo;a<=hi;a++){
+    const y=ORVIA_YEAR-a,idx=((y-1)%60+60)%60;
+    const gan=GANS_ALL[idx%10],ji=JIS_ALL[idx%12];
+    let w=1;
+    if(rElem){
+      if(gan.e===rElem)w*=1+bias*4;
+      if(ji.e===rElem)w*=1+bias*4;
+    }
+    tot+=w;cands.push({year:y,age:a,gan:gan,ji:ji,w:w});
+  }
+  if(!cands.length)return{year:ORVIA_YEAR-lo,age:lo};
+  let r=Math.random()*tot;
+  for(let i=0;i<cands.length;i++){r-=cands[i].w;if(r<=0)return cands[i];}
+  return cands[cands.length-1];
+}
+// 인물 나이 = 기준 연도 − 고정 생년 (저장하지 않고 매번 계산)
+function charRealAge(d){if(!(d&&d.birth&&d.birth.year))return null;const a=ORVIA_YEAR-d.birth.year;return isFinite(a)?a:null;}
+function charAppAge(d){const a=charRealAge(d);if(a==null)return null;const sp=(d&&d.race&&RACES[d.race])?d.race:'human';return Math.floor(a*((RACES[sp]||{}).ageRatio||1));}
+function charAgeStr(d){const a=charRealAge(d);if(a==null)return'';const p=charAppAge(d);return(p!==a)?(p+'세(실제 '+a+'세)'):(a+'세');}
+function charSubLine(d){
+  if(!(d&&d.birth&&d.birth.year))return(d&&d.sub)||'';
+  const b=d.birth;
+  let t=b.year+'년'+(b.month?' '+b.month+'월':'')+(b.day?' '+b.day+'일':'')+'생 · '+charAgeStr(d);
+  if(d.subTail)t+=' · '+d.subTail;
+  return t;
+}
+function charInfoLine(d){
+  if(!(d&&d.ageInInfo))return(d&&d.info)||'';
+  const a=charRealAge(d);if(a==null)return d.info||'';
+  return d.info+' · '+charAgeStr(d)+'·'+calcAgeStage(d).label;
+}
+// 기준 연도가 바뀌면 나이 표기·연령대 구간을 그 자리에서 다시 그린다 (재생성 아님)
+function refreshAgeUI(){
+  if(!currentData)return;
+  try{
+    const ci=document.getElementById('ci');
+    if(ci){const nm=currentData.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'';ci.innerHTML=nm+'<div>'+charInfoLine(currentData)+'</div>';}
+    const cs=document.getElementById('cs');if(cs)cs.textContent=charSubLine(currentData);
+    renderAppearance(currentData);
+  }catch(e){}
+}
 function randomNpc(){
   const gdr=Math.random()>.5?'m':'f';
   // Random race (weighted)
@@ -900,12 +1040,14 @@ function randomNpc(){
   // Random birth date (사주를 먼저 계산해야 인간 하위종족 이름 풀 선택 가능 — TDZ 버그 수정)
   const minAge=raceData.minAge;
   const maxAge=raceData.maxAge;
-  const age=Math.floor(Math.random()*(maxAge-minAge+1))+minAge;
-  const bYear=ORVIA_YEAR-age;
+  // 고정 생년을 먼저 고른다 (원국 정합) — 나이는 저장하지 않고 기준 연도에서 파생
+  const _by=pickBirthYear(race,minAge,maxAge);
+  const age=_by.age;
+  const bYear=_by.year;
   const bMonth=Math.floor(Math.random()*12)+1;
   const bDay=Math.floor(Math.random()*dimOf(bYear,bMonth))+1;
   const bHour=Math.floor(Math.random()*12);
-  const saju=calcSajuFromDate(bYear,bMonth,bDay,bHour,race);
+  const saju=calcSajuFromDate(bYear,bMonth,bDay,bHour,race,true);
   const pils=saju.p;
   // Name generation (race-aware)
   const _mPool={elf:RNAMES_ELF_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
@@ -2057,7 +2199,7 @@ function dmGenerate(){
   const pils=[{g:gans[2],j:jis[3]},{g:dayGan,j:jis[2]},{g:gans[1],j:jis[1]},{g:gans[0],j:jis[0]}];
   // ── 연령대 → 생년 밴드 → 년주를 60갑자 정합 쌍에서 가중 선택 (년주-생년 모순 없음) ──
   const _rd=RACES[race]||RACES.human;
-  const _bdA=AGE_STAGES[race]||AGE_STAGES.human;
+  const _bdA=ageStageBounds(race);
   const _life=DM_LIFESPAN[race]||75;
   let _lo=_rd.minAge,_hi=_rd.maxAge;
   if(dmState.stage==='youth'){_hi=Math.min(_hi,_bdA[0]-1);}
@@ -2095,7 +2237,7 @@ function dmGenerate(){
   const rk=['F','E','D','C','B','A','S'][Math.min(Math.floor(lv/7),6)];
   const gIcon=gdr==='m'?'♂':'♀';
   const _displayEthno=_ethnoId||(pils[3]?ELEM_TO_ETHNO[pils[3].g.e]:null);
-  const rd={name:nm,surname:_surname,firstname:_firstname,info:`Lv.${lv} · ${dayGan.n}자리 · ${rk}랭크 · ${gIcon} · ${race==='human'?(ETHNO[_displayEthno]||{name:'인간'}).name:RACES[race].name} · ${_appAge!==_age?`${_appAge}세(실제 ${_age}세)`:`${_age}세`}·${STAGE_KO[_age<_bdA[0]?'youth':(_age<_bdA[1]?'middle':'elder')]}`,badge:'설계됨',gender:gdr,race:race,
+  const rd={name:nm,surname:_surname,firstname:_firstname,info:`Lv.${lv} · ${dayGan.n}자리 · ${rk}랭크 · ${gIcon} · ${race==='human'?(ETHNO[_displayEthno]||{name:'인간'}).name:RACES[race].name}`,ageInInfo:true,badge:'설계됨',gender:gdr,race:race,
     p:pils,el:elc,birth:{year:_birthYear},appAge:_appAge,
     st:{ap:3+Math.floor(Math.random()*8),speed:30+Math.floor(Math.random()*60),hp:120+Math.floor(Math.random()*280),power:20+Math.floor(Math.random()*70),precision:20+Math.floor(Math.random()*70),resist:15+Math.floor(Math.random()*60)}};
   mode='npc';
@@ -2300,6 +2442,138 @@ function beardSelHtml(d,bt,ast,rid){
   return h;
 }
 
+// ═══ 연령대 설정 UI — 종족별 실나이 구간 편집 (외형 탭 · 남녀 공통) ═══
+const AGE_CFG_SPS=['human','elf','darkelf','dwarf','orc','ogre'];
+let ageCfgSp='human';
+function ageCfgBtnHtml(ast){
+  const sp=(ast&&ast.sp)||'human',bs=ageBands(sp);
+  const nm=(RACES[sp]&&RACES[sp].name)||'인간';
+  const pin=(currentData&&currentData.ageBandPin)||'';
+  const esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');};
+  let sel='<select id="agepin" onchange="agePinSet(this.value)" title="이 인물의 연령대를 손으로 지정 (나이 판정 무시)" style="padding:2px 5px;border-radius:8px;border:1px solid '+(pin?'var(--gold)':'var(--bdr2)')+';background:var(--card);color:'+(pin?'var(--gold)':'var(--dim)')+';font-size:9px;cursor:pointer;max-width:104px;">';
+  sel+='<option value=""'+(pin?'':' selected')+'>자동 (나이 기준)</option>';
+  bs.forEach(function(b){sel+='<option value="'+esc(b.id)+'"'+(pin===b.id?' selected':'')+'>'+esc(b.label)+' 고정</option>';});
+  sel+='</select>';
+  return '<div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin:-2px 0 7px;padding:0 3px;flex-wrap:wrap;">'
+    +'<span style="font-size:8px;color:var(--dim);">'+nm+' 연령 구간 '+bs.length+'개 · 남녀 공통'+(ageBandsCustom(sp)?' · 수동 배열':'')+'</span>'
+    +sel
+    +'<button id="agecfg-open" onclick="openAgeCfg(\''+sp+'\')" style="padding:3px 9px;border-radius:10px;border:1px solid var(--bdr2);background:transparent;color:var(--gold);font-size:9px;cursor:pointer;white-space:nowrap;">⚙ 연령대 설정</button></div>';
+}
+function openAgeCfg(sp){ageCfgSp=(sp&&AGE_CFG_SPS.indexOf(sp)>=0)?sp:'human';drawAgeCfg();}
+function closeAgeCfg(){const el=document.getElementById('agecfg-modal');if(el)el.innerHTML='';}
+function ageCfgPick(sp){ageCfgSp=sp;drawAgeCfg();}
+function ageCfgCopy(){return ageBands(ageCfgSp).map(function(b){return{id:b.id,label:b.label,from:b.from};});}
+function ageCfgSet(a){
+  naiSlots.ageBands=naiSlots.ageBands||{};
+  // keepOrder — 사용자가 짠 순서를 자동으로 바꾸지 않는다
+  naiSlots.ageBands[ageCfgSp]=ageBandsSanitize(ageCfgSp,a,true);
+  naiSaveSlots();
+  drawAgeCfg();
+  if(currentData)renderAppearance(currentData);
+}
+// 수동 배열 — 구간 순서 직접 이동
+function ageCfgMove(i,dir){
+  const a=ageCfgCopy(),j=i+dir;
+  if(!a[i]||!a[j])return;
+  const t=a[i];a[i]=a[j];a[j]=t;
+  ageCfgSet(a);
+}
+// 글로벌 기준 연도
+function ageCfgYear(v){
+  const n=parseInt(v,10);if(!isFinite(n))return;
+  orviaYearSet(n);
+  drawAgeCfg();
+  refreshAgeUI();
+}
+function ageCfgYearStep(delta){orviaYearSet(ORVIA_YEAR+delta);drawAgeCfg();refreshAgeUI();}
+function ageCfgYearReset(){orviaYearSet(ORVIA_YEAR_DEF);drawAgeCfg();refreshAgeUI();}
+// 인물별 연령대 수동 지정 (자동 판정 무시)
+function agePinSet(v){
+  if(!currentData)return;
+  if(v)currentData.ageBandPin=v;else delete currentData.ageBandPin;
+  renderAppearance(currentData);
+  const ci=document.getElementById('ci');
+  if(ci&&currentData.ageInInfo){const nm=currentData.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'';ci.innerHTML=nm+'<div>'+charInfoLine(currentData)+'</div>';}
+}
+function ageCfgLabel(i,v){const a=ageCfgCopy();if(!a[i])return;a[i].label=v;ageCfgSet(a);}
+function ageCfgFrom(i,v){const a=ageCfgCopy();if(!a[i])return;const n=parseInt(v,10);if(!isFinite(n))return;a[i].from=n;ageCfgSet(a);}
+function ageCfgAdd(){
+  const a=ageCfgCopy(),R=RACES[ageCfgSp]||RACES.human;
+  const life=(typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[ageCfgSp])||R.maxAge||75;
+  const last=a[a.length-1];
+  const nf=Math.max(last.from+1,Math.round(last.from+Math.max(2,(life-last.from)/2)));
+  a.push({id:ageBandNewId(a),label:'새 구간',from:nf});
+  ageCfgSet(a);
+}
+function ageCfgDel(i){const a=ageCfgCopy();if(a.length<=1)return;a.splice(i,1);ageCfgSet(a);}
+function ageCfgReset(){if(naiSlots&&naiSlots.ageBands)delete naiSlots.ageBands[ageCfgSp];naiSaveSlots();drawAgeCfg();if(currentData)renderAppearance(currentData);}
+function drawAgeCfg(){
+  const el=document.getElementById('agecfg-modal');if(!el)return;
+  const sp=ageCfgSp,bs=ageBands(sp),R=RACES[sp]||RACES.human;
+  const ar=R.ageRatio||1,fl=ageAdultFloor(sp);
+  const life=(typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[sp])||R.maxAge||75;
+  const cust=!!ageBandsCustom(sp);
+  let curId=null;
+  if(currentData){const ca=calcAgeStage(currentData);if(ca.sp===sp&&!ca.unknown)curId=ca.stage;}
+  const apx=n=>(ar===1)?'':'<div style="color:var(--fnt);font-size:8px;">외견 '+Math.floor(n*ar)+'세~</div>';
+  const esc=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  let h='<div class="modal-overlay" onclick="if(event.target===this)closeAgeCfg()"><div class="modal-box" style="max-width:400px;">'
+    +'<button class="modal-close" onclick="closeAgeCfg()">✕</button>'
+    +'<div class="modal-title">연 령 대 설 정</div>'
+    +'<div class="modal-sub">종족별 실나이 구간 · 남녀 공통 — 구간 1개당 남/여 프리셋 2칸</div>';
+  // ── 글로벌: 기준 연도 ──
+  h+='<div id="agecfg-global" style="border:1px solid var(--bdr2);border-radius:8px;padding:8px 9px;margin-bottom:11px;background:rgba(212,168,67,.04);">'
+    +'<div style="display:flex;align-items:center;gap:6px;">'
+    +'<span style="font-size:10px;color:var(--gold);font-weight:700;white-space:nowrap;">기준 연도</span>'
+    +'<button onclick="ageCfgYearStep(-10)" style="padding:2px 6px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:9px;cursor:pointer;">−10</button>'
+    +'<button onclick="ageCfgYearStep(-1)" style="padding:2px 6px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:9px;cursor:pointer;">−1</button>'
+    +'<input id="agecfg-year" type="number" step="1" min="1" value="'+ORVIA_YEAR+'" onchange="ageCfgYear(this.value)" style="width:74px;text-align:center;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:11px;padding:3px 5px;">'
+    +'<button onclick="ageCfgYearStep(1)" style="padding:2px 6px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:9px;cursor:pointer;">+1</button>'
+    +'<button onclick="ageCfgYearStep(10)" style="padding:2px 6px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:9px;cursor:pointer;">+10</button>'
+    +(ORVIA_YEAR!==ORVIA_YEAR_DEF?'<button id="agecfg-yreset" onclick="ageCfgYearReset()" title="기본 '+ORVIA_YEAR_DEF+'년" style="padding:2px 6px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:9px;cursor:pointer;">↺</button>':'')
+    +'</div>'
+    +'<div style="font-size:8px;color:var(--fnt);line-height:1.7;margin-top:6px;">전 종족 공통. 인물은 <b style="color:var(--dim);">고정 생년</b>만 갖고 나이는 저장하지 않습니다 — 기준 연도를 바꾸면 이미 만든 인물 전원의 나이가 함께 움직입니다.</div>'
+    +'</div>';
+  h+='<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">'
+    +AGE_CFG_SPS.map(function(k){
+      const on=(k===sp),c=!!ageBandsCustom(k);
+      return '<button class="agecfg-sp" data-sp="'+k+'" onclick="ageCfgPick(\''+k+'\')" style="padding:4px 9px;border-radius:11px;border:1px solid '+(on?'var(--gold)':'var(--bdr)')+';background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'var(--bg)':'var(--dim)')+';font-size:10px;cursor:pointer;font-weight:'+(on?'700':'400')+';">'+((RACES[k]||{}).name||k)+(c?'<span style="opacity:.7;font-size:8px;"> •</span>':'')+'</button>';
+    }).join('')+'</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">'
+    +'<span style="font-size:9px;color:var(--gold);font-weight:700;">'+(((RACES[sp]||{}).name)||sp)+' 연령 구간 · 수동 배열</span>'
+    +'<span style="font-size:8px;color:'+(ageBandsAscending(bs)?'var(--fnt)':'#c46')+';">'+(ageBandsAscending(bs)?'▲▼ 로 순서를 직접 옮깁니다':'⚠ 시작 나이가 오름차순이 아닙니다 (배열 그대로 적용됨)')+'</span></div>';
+  h+='<table class="modal-tbl" id="agecfg-tbl"><tr><th style="width:26px;"></th><th style="width:84px;">구간 이름</th><th style="width:60px;">시작 나이</th><th>구간 · 프리셋 키</th><th style="width:16px;"></th></tr>';
+  bs.forEach(function(b,i){
+    const to=(i+1<bs.length)?bs[i+1].from-1:null;
+    const cur=(b.id===curId);
+    h+='<tr'+(cur?' style="background:rgba(212,168,67,.08);"':'')+'>'
+      +'<td style="white-space:nowrap;padding:0;">'
+      +'<button class="agecfg-up" data-i="'+i+'" onclick="ageCfgMove('+i+',-1)" title="위로" '+(i===0?'disabled':'')+' style="background:none;border:none;color:'+(i===0?'var(--bdr)':'var(--dim)')+';font-size:9px;cursor:'+(i===0?'default':'pointer')+';padding:0 1px;display:block;line-height:1.1;">▲</button>'
+      +'<button class="agecfg-dn" data-i="'+i+'" onclick="ageCfgMove('+i+',1)" title="아래로" '+(i===bs.length-1?'disabled':'')+' style="background:none;border:none;color:'+(i===bs.length-1?'var(--bdr)':'var(--dim)')+';font-size:9px;cursor:'+(i===bs.length-1?'default':'pointer')+';padding:0 1px;display:block;line-height:1.1;">▼</button>'
+      +'</td>'
+      +'<td><input class="agecfg-lb" data-i="'+i+'" value="'+esc(b.label)+'" onchange="ageCfgLabel('+i+',this.value)" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:10px;padding:3px 5px;"></td>'
+      +'<td>'+(i===0
+        ? '<span style="font-size:10px;color:var(--dim);">'+fl+'<span style="font-size:8px;"> 고정</span></span>'
+        : '<input class="agecfg-fr" data-i="'+i+'" type="number" min="'+(fl+1)+'" step="1" value="'+b.from+'" onchange="ageCfgFrom('+i+',this.value)" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:10px;padding:3px 5px;">')+'</td>'
+      +'<td class="ss-ex"><span style="color:var(--txt);">'+ageRangeKo(b.from,to)+'</span>'+(cur?' <span style="color:var(--gold);">◀ 현재</span>':'')+apx(b.from)
+      +'<div style="color:var(--fnt);font-size:8px;">age_'+b.id+'_m · age_'+b.id+'_f</div></td>'
+      +'<td>'+(bs.length>1?'<button class="agecfg-del" data-i="'+i+'" onclick="ageCfgDel('+i+')" title="구간 삭제" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;padding:0 2px;">✕</button>':'')+'</td></tr>';
+  });
+  h+='</table>';
+  h+='<div style="display:flex;gap:6px;margin-top:10px;">'
+    +'<button id="agecfg-add" onclick="ageCfgAdd()" style="flex:1;padding:7px;border-radius:8px;border:1px dashed var(--bdr2);background:transparent;color:var(--gold);font-size:10px;cursor:pointer;">＋ 구간 추가</button>'
+    +(cust?'<button id="agecfg-reset" onclick="ageCfgReset()" style="padding:7px 11px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--dim);font-size:10px;cursor:pointer;">↺ 기본값</button>':'')
+    +'</div>';
+  h+='<div style="font-size:8px;color:var(--fnt);line-height:1.8;margin-top:10px;border-top:1px solid var(--bdr);padding-top:8px;">'
+    +'· 구간을 추가하면 그 구간의 남/여 프리셋 칸이 외형 탭에 바로 생깁니다. 구간 이름을 바꿔도 적어둔 프롬프트는 그대로 붙어 있습니다.<br>'
+    +'· 구간을 지워도 적어둔 프롬프트 텍스트는 지우지 않습니다 — 같은 구간을 다시 만들면 그대로 돌아옵니다.<br>'
+    +'· 남녀 공통 구간이지만 프리셋은 남/여로 나뉩니다. 성별 구분은 프리셋 쪽에서 하세요.<br>'
+    +'· 구간 순서는 ▲▼로 직접 배열합니다 — 자동 정렬하지 않습니다. i번 구간은 다음 구간 시작 직전까지가 범위입니다.<br>'
+    +'· 첫 구간 하한은 성인 기준(외견 18세 = '+((RACES[sp]||{}).name||'인간')+' 실나이 '+fl+'세)으로 고정됩니다.<br>'
+    +'· 참고: '+((RACES[sp]||{}).name||'인간')+' 수명 '+life+'세 · 외견 나이 비율 ×'+ar+'</div>';
+  h+='</div></div>';
+  el.innerHTML=h;
+}
 // === 천간·지지 신체 modifier 테이블 (설계서 §4.4 기준) ===
 // 각 항목: [fat, muscle, height(cm), penis, breast, browThick, eyeCorner, pupilSize, pelvis]
 const STEM_BODY={
@@ -2454,7 +2728,9 @@ function renderAppearance(d){
   const arch=getAppearArchetype(d);const ap=arch.data;
   const bl=bodyLabel(bt.fat,bt.muscle);
   const _astRow=calcAgeStage(d);
-  const _astRowV=_astRow.unknown?'미상 — 성인 기준':(_astRow.label+' · '+_astRow.age+'세'+((_astRow.appAge!=null&&_astRow.appAge!==_astRow.age)?' (외견 '+_astRow.appAge+'세)':''));
+  const _astRng=' <span style="font-size:9px;color:var(--dim);font-weight:400;">'+ageRangeKo(_astRow.bandFrom,_astRow.bandTo)+'</span>';
+  const _astPin=_astRow.pinned?' <span style="font-size:9px;color:var(--gold);font-weight:400;">수동</span>':'';
+  const _astRowV=_astRow.unknown?('미상 — 성인 기준'+_astRng+_astPin):(_astRow.label+' · '+_astRow.age+'세'+((_astRow.appAge!=null&&_astRow.appAge!==_astRow.age)?' (외견 '+_astRow.appAge+'세)':'')+_astRng+_astPin);
   const hStr=heightLabel(bt.height,gdr,_raceId);
   const browStr=bt.brow>=0.5?'굵은 눈썹':'가는 눈썹';
   const _ecur=eyeSel(d);
@@ -2484,13 +2760,14 @@ function renderAppearance(d){
   h+=slotRowEditor(_bk,sdefs[_bk]);
   h+=slotRow(_pl('fat'),(bt.fat>=0?'+':'')+bt.fat.toFixed(2),_pk('fat'),sdefs[_pk('fat')]);
   h+=slotRow(_pl('muscle'),(bt.muscle>=0?'+':'')+bt.muscle.toFixed(2),_pk('muscle'),sdefs[_pk('muscle')]);
-  [{l:'연령대 ['+ageSexLabel(_astRow.stage,gdr)+']',v:_astRowV,k:'age_'+_astRow.stage+'_'+gdr},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye'),v:(EL_NAME_KR[_ecur.id]||'')+' · '+_ecur.label+(_ecur.manual?' <span style="color:var(--gold);">수동</span>':''),k:_pk('eye')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='m'?[{l:_pl('beard'),v:_bcur.label+(_bcur.manual?' <span style="color:var(--gold);">수동</span>':''),k:_pk('beard')}]:[]).concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
+  [{l:'연령대 ['+ageSexLabel(_astRow,gdr)+']',v:_astRowV,k:'age_'+_astRow.stage+'_'+gdr,ageBtn:1},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye'),v:(EL_NAME_KR[_ecur.id]||'')+' · '+_ecur.label+(_ecur.manual?' <span style="color:var(--gold);">수동</span>':''),k:_pk('eye')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='m'?[{l:_pl('beard'),v:_bcur.label+(_bcur.manual?' <span style="color:var(--gold);">수동</span>':''),k:_pk('beard')}]:[]).concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
     {l:_pl('butt'),v:'',k:_pk('butt')},{l:_pl('thigh'),v:'',k:_pk('thigh')},
     {l:_pl('waist'),v:'',k:_pk('waist')},{l:_pl('shoulder'),v:'',k:_pk('shoulder')},
     {l:_pl('belly'),v:'',k:_pk('belly')},{l:_pl('lips'),v:'',k:_pk('lips')},
     {l:_pl('limbs'),v:'',k:_pk('limbs')}
   ]).forEach(t=>{
-    h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
+    h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);
+    if(t.ageBtn)h+=ageCfgBtnHtml(_astRow);});
   const _hcur=hairSel(d);
   h+=`<div style="font-size:9px;color:var(--dim);margin:12px 0 4px;letter-spacing:1px;">모발 (원국 자동 산출 · 아래에서 수동 변경 가능)</div>`;
   HAIR_AXES.forEach(A=>{
@@ -3042,7 +3319,7 @@ function renderAttraction(d){
 //   공통 슬롯 = 그림체/구도/네거티브 (전 캐릭터 범용)
 //   저장: 로컬 서버 slots.json (자동 저장, 디바운스)
 // ═══════════════════════════════════════
-let naiSlots={common:{},byAddr:{},partsOff:{}};
+let naiSlots={common:{},byAddr:{},partsOff:{},ageBands:{},baseYear:null};
 let naiSlotsSaveTimer=null;
 let slotSecOpen=false;
 let naiLastSeed=0;
@@ -3108,14 +3385,16 @@ function naiGetKey(){return naiSessionKey||NAI_LS.get('gahorok_nai_key')||'';}
 async function naiLoadSlots(){
   if(NAI_SERVER_MODE){
     try{const r=await fetch('/slots');const j=await r.json();
-      if(j&&typeof j==='object')naiSlots={common:j.common||{},byAddr:j.byAddr||{},partsOff:j.partsOff||{}};
+      if(j&&typeof j==='object')naiSlots={common:j.common||{},byAddr:j.byAddr||{},partsOff:j.partsOff||{},ageBands:j.ageBands||{},baseYear:(j.baseYear!=null?j.baseYear:null)};
     }catch(e){}
   }else{
     try{const j=JSON.parse(NAI_LS.get('gahorok_slots')||'null');
-      if(j&&typeof j==='object')naiSlots={common:j.common||{},byAddr:j.byAddr||{},partsOff:j.partsOff||{}};
+      if(j&&typeof j==='object')naiSlots={common:j.common||{},byAddr:j.byAddr||{},partsOff:j.partsOff||{},ageBands:j.ageBands||{},baseYear:(j.baseYear!=null?j.baseYear:null)};
     }catch(e){}
   }
-  if(currentData)renderNAI(currentData);
+  orviaYearSync();
+  if(currentData){renderNAI(currentData);refreshAgeUI();}
+  else if(currentData===null||currentData===undefined){/* 부팅 전 */}
 }
 function naiSaveSlots(){
   clearTimeout(naiSlotsSaveTimer);
@@ -3171,7 +3450,7 @@ function naiParts(d){
     {key:'body@'+vs(bl[0]),label:'체형(종합) ['+bl[0]+']',def:''},
     {key:'fat@'+fatG[0],label:'비만도 ['+fatG[0]+']',def:fatG[1]},
     {key:'muscle@'+musG[0],label:'근육도 ['+musG[0]+']',def:musG[1]},
-    {key:'age_'+_ast.stage+'_'+gdr,label:'연령대 ['+ageSexLabel(_ast.stage,gdr)+']',def:ageStageDefault(_astSp,_ast.stage,gdr)},
+    {key:'age_'+_ast.stage+'_'+gdr,label:'연령대 ['+ageSexLabel(_ast,gdr)+']',def:ageStageDefault(_astSp,_ast.stage,gdr)},
     {key:'height@'+hV,label:'키/체구 ['+hV+']',def:''},
     {key:'eye@'+vs(_eo.label),label:'눈매 ['+_eo.label+']',def:_eo.nai},
     {key:'pupil@'+vs(puV),label:'눈동자 크기 ['+puV+']',def:bt.pupil>=0.5?'large eyes':'small eyes'},
@@ -3683,7 +3962,7 @@ async function runCompat(d,gdr,gen){
     // ── 필터: 종족 × 연령대 → 스캔 생년 범위 ──
     const race=csFilter.race||'human';
     const R=RACES[race]||RACES.human;
-    const bd=AGE_STAGES[race]||AGE_STAGES.human;
+    const bd=ageStageBounds(race);
     const life=(typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[race])||75;
     let loA=R.minAge,hiA=R.maxAge;
     const stg=csFilter.stage||'any';
@@ -3819,6 +4098,7 @@ window.csSpawn=function(idx){
   const rd={name:sn?sn+' '+fn:fn,surname:sn,firstname:fn,
     info:`Lv.${lv} · ${c.saju.p[1].g.n}자리 · ${rk}랭크 · ${gdr==='m'?'♂':'♀'} · ${raceName}`,
     sub:`${b.year}년 ${b.month}월 ${b.day}일생 · ${ageStr} · ${chartStr(c.saju.p)}`,
+    subTail:chartStr(c.saju.p),
     badge:'궁합 시뮬',gender:gdr,race:race,ethno:eth||undefined,
     p:c.saju.p,el:elOf(c.saju.p),birth:b,appAge:appAge,
     st:{ap:3+Math.floor(Math.random()*8),speed:30+Math.floor(Math.random()*60),hp:120+Math.floor(Math.random()*280),power:20+Math.floor(Math.random()*70),precision:20+Math.floor(Math.random()*70),resist:15+Math.floor(Math.random()*60)}};
@@ -4260,7 +4540,7 @@ try{nsApplyGenOpts(JSON.parse(NAI_LS.get('gahorok_genopts')||'null'));}catch(e){
 // ── 통합 설정 내보내기/가져오기 (키 제외) ──
 window.nsBuildSettings=function(){
   return {app:'gahorok',kind:'settings',ver:1,exported:new Date().toISOString(),
-    slots:{common:(naiSlots&&naiSlots.common)||{},byAddr:(naiSlots&&naiSlots.byAddr)||{},partsOff:(naiSlots&&naiSlots.partsOff)||{}},
+    slots:{common:(naiSlots&&naiSlots.common)||{},byAddr:(naiSlots&&naiSlots.byAddr)||{},partsOff:(naiSlots&&naiSlots.partsOff)||{},ageBands:(naiSlots&&naiSlots.ageBands)||{},baseYear:(naiSlots&&naiSlots.baseYear!=null)?naiSlots.baseYear:null},
     genOpts:nsGetGenOpts(),
     promptHistory:naiPromptHist,
     proxy:NAI_LS.get('gahorok_proxy_url')||''};
@@ -4278,7 +4558,8 @@ window.nsApplySettings=function(j){
   else if(j.common!==undefined||j.byAddr!==undefined){slots=j;}   // 구버전 slots.json
   else return '알 수 없는 형식 — gahorok_settings.json 또는 slots.json이어야 함';
   if(slots&&typeof slots==='object'){
-    naiSlots={common:slots.common||{},byAddr:slots.byAddr||{},partsOff:slots.partsOff||{}};
+    naiSlots={common:slots.common||{},byAddr:slots.byAddr||{},partsOff:slots.partsOff||{},ageBands:slots.ageBands||{},baseYear:(slots.baseYear!=null?slots.baseYear:null)};
+    orviaYearSync();
     clearTimeout(naiSlotsSaveTimer);   // 가져오기는 디바운스 없이 즉시 저장 (직후 이탈 시 유실 방지)
     if(NAI_SERVER_MODE){fetch('/slots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(naiSlots)}).catch(()=>{});}
     else{NAI_LS.set('gahorok_slots',JSON.stringify(naiSlots));}
