@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v13 + NAI</title>
+<title>가호록 v14.5 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -336,7 +336,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
     <div class="stit">외 형 파 생</div><div class="ssub">원국에서 도출된 외형 특성 · NAI 태그</div>
     <div id="appear-sec"></div>
     <div style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;">
-      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">머리 길이 (수동 선택)</div>
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">머리 모양 — 길이 · 묶음 · 땋음 · 앞머리 (원국 자동 · 클릭 시 수동 지정)</div>
       <div id="hair-len-sel" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
     <div style="margin-top:12px;padding:10px;background:#0a0b10;border:1px solid var(--bdr);border-radius:10px;position:relative;">
@@ -635,7 +635,7 @@ function generateSynopsis(d){
   sec.innerHTML=sentences.join(' ');
 }
 
-function render(d){currentData=d;document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+d.info+'</div>';document.getElementById('cs').textContent=d.sub||'';document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
+function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+d.info+'</div>';document.getElementById('cs').textContent=d.sub||'';document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
 
 function buildTable(d){
   const rg=document.getElementById('rg'),rj=document.getElementById('rj');rg.innerHTML='';rj.innerHTML='';
@@ -2091,9 +2091,89 @@ function dmGenerate(){
 
 
 // ═══ 외형 파생 엔진 v2 (천간·지지 수치화 모델) ═══
-let selectedHairLen='mid';
+// ═══ 모발 4축 (길이·묶음·땋음·앞머리) ═══
+// 원국에서 자동 산출 → 버튼으로 수동 변경 가능 → 축별 등급 프롬프트 프리셋
 const HAIR_LENS=[{id:'vshort',label:'숏컷',nai:'short hair'},{id:'short',label:'단발',nai:'bob cut'},{id:'mid',label:'중간',nai:'medium hair'},{id:'long',label:'장발',nai:'long hair'},{id:'vlong',label:'극장발',nai:'very long hair'}];
-function setHairLen(id){selectedHairLen=id;document.querySelectorAll('.hl-btn').forEach(b=>{b.style.background=b.dataset.hl===id?'var(--gold)':'transparent';b.style.color=b.dataset.hl===id?'var(--bg)':'var(--dim)';b.style.fontWeight=b.dataset.hl===id?'700':'400';});if(currentData)renderNAI(currentData);}
+const HAIR_TIES=[{id:'down',label:'풀어헤침',nai:''},{id:'half',label:'반묶음',nai:'half updo, half-up hairstyle'},{id:'tail',label:'묶음',nai:'ponytail, tied hair'},{id:'up',label:'올림머리',nai:'updo, hair bun, hair up'}];
+const HAIR_BRAIDS=[{id:'none',label:'없음',nai:''},{id:'part',label:'부분 땋기',nai:'side braid, braided sidelock'},{id:'full',label:'전체 땋기',nai:'braided hair, braid'}];
+const HAIR_BANGS=[{id:'none',label:'이마 노출',nai:'forehead, no bangs, slicked back hair'},{id:'center',label:'가르마',nai:'parted bangs, center-parted hair'},{id:'side',label:'사이드뱅',nai:'swept bangs, side-swept bangs'},{id:'sheer',label:'시스루뱅',nai:'wispy bangs, see-through bangs'},{id:'blunt',label:'일자뱅',nai:'blunt bangs, straight bangs'}];
+const HAIR_AXES=[{ax:'len',ko:'길이',tab:HAIR_LENS,key:'hair_len'},{ax:'tie',ko:'묶음',tab:HAIR_TIES,key:'hair_tie'},{ax:'braid',ko:'땋음',tab:HAIR_BRAIDS,key:'hair_braid'},{ax:'bang',ko:'앞머리',tab:HAIR_BANGS,key:'hair_bang'}];
+// 종족/인종별 모발 길이 관습 보정
+const HAIR_RACE_LEN={helia:0,ryuan:0.05,nahar:0,osela:-0.05,rugen:0.05,elf:0.18,darkelf:0.15,dwarf:0.05,orc:-0.30,ogre:-0.18};
+// 종족/인종별 땋음 관습 보정 (드워프·오크 = 땋아 묶는 문화 / 오우거 = 손재주 부재)
+const HAIR_RACE_BRAID={helia:0,ryuan:0.06,nahar:0.10,osela:-0.04,rugen:0.08,elf:0.10,darkelf:0.06,dwarf:0.22,orc:0.14,ogre:-0.14};
+// 원국 4지지 중 육합/삼합을 이루는 쌍의 수 (엮임 = 땋음의 재료)
+function hairHapCount(d){
+  if(!d||!d.p)return 0;
+  const J='子丑寅卯辰巳午未申酉戌亥';
+  const idx=[];
+  for(let i=0;i<4;i++){const j=d.p[i].j;if(!j.lk&&j.tid){const k=J.indexOf(j.tid);if(k>=0)idx.push(k);}}
+  const SH=[[8,0,4],[2,6,10],[5,9,1],[11,3,7]];
+  let n=0;
+  for(let a=0;a<idx.length;a++)for(let b=a+1;b<idx.length;b++){
+    if((idx[a]+idx[b])%12===1)n++;                                     // 육합
+    else if(idx[a]!==idx[b]&&SH.some(g=>g.includes(idx[a])&&g.includes(idx[b])))n++;  // 삼합
+  }
+  return n;
+}
+// 원국 → 모발 4축 자동 산출
+function calcHair(d){
+  const el=(d&&d.el)||{};
+  const W=(el.wood||0)/100,F=(el.fire||0)/100,E=(el.earth||0)/100,M=(el.metal||0)/100,A=(el.water||0)/100;
+  let pr=null;try{pr=calcParams(d);}catch(e){}
+  const tot=(pr&&pr.total)?pr.total:0;
+  const R=k=>tot?((pr.counts[k]||0)/tot):0.2;
+  const gdr=(d&&d.gender)||'m';
+  const rid=(d&&d.race==='human')?(d.ethno||'helia'):((d&&d.race)||'human');
+  const gf=gdr==='f';
+  const hap=hairHapCount(d);
+  // ① 길이 — 木(뻗음)·水(신정) 은 기르고, 金(절삭)·火(발산) 은 자른다 · 印 기름 / 食傷 자름
+  const Ls=(W+A)-(M+F)+0.35*(R('reflect')-R('express'))+(gf?0.22:-0.18)+(HAIR_RACE_LEN[rid]||0);
+  const len=Ls<=-0.35?'vshort':Ls<=-0.12?'short':Ls<0.12?'mid':Ls<0.35?'long':'vlong';
+  // ② 묶음 — 金(정돈)·土(수렴) 은 묶고, 火(발산)·木(뻗음) 은 푼다 · 官 격식 / 食傷 파격
+  //    +0.28 = 엔진 오행 실측 분포상 (金土)-(火木) 의 평균 편차 보정 (중앙 정렬)
+  const Ts=((M+E)-(F+W)+0.28)+0.35*(R('discip')-R('express'))+(gf?0.10:-0.10);
+  let tie=Ts<=-0.01?'down':Ts<0.18?'half':Ts<0.35?'tail':'up';
+  // ③ 땋음 — 지지 합(엮임)이 주재료 · 土/木 의 손길 · 印 전통 · 종족 관습
+  //    실측 중앙값 기준 재정렬: 합 1.5쌍 / 土木합 0.38 / 印 0.20 을 원점으로
+  const Bs=(hap-1.5)*0.28+((E+W)-0.38)*0.80+0.30*(R('reflect')-0.20)
+          +(gf?0.06:-0.18)+(HAIR_RACE_BRAID[rid]||0);
+  let braid=Bs<0.06?'none':Bs<0.36?'part':'full';
+  // ④ 앞머리 — 이마(관록궁) 노출도. 火·金 은 드러내고, 水·木 은 덮는다 · 官 노출 / 印 보호
+  const Fs=(F+M)-(A+W)+0.30*(R('discip')-R('reflect'))+(gf?-0.12:0.12);
+  const bang=Fs>=0.32?'none':Fs>=0.10?'center':Fs>=-0.10?'side':Fs>=-0.32?'sheer':'blunt';
+  // 길이 게이트: 짧은 머리는 묶거나 땋을 수 없다 (자동값에만 적용 — 수동 지정은 존중)
+  if(len==='vshort'){tie='down';braid='none';}
+  else if(len==='short'){if(tie==='tail'||tie==='up')tie='half';if(braid==='full')braid='part';}
+  return{len,tie,braid,bang,sc:{L:Ls,T:Ts,B:Bs,F:Fs,hap}};
+}
+// 수동 지정 오버라이드 (null = 자동) — 새 인물 생성 시 render() 에서 초기화
+let hairOv={len:null,tie:null,braid:null,bang:null};
+function hairSel(d){
+  const a=calcHair(d);
+  return{len:hairOv.len||a.len,tie:hairOv.tie||a.tie,braid:hairOv.braid||a.braid,bang:hairOv.bang||a.bang,auto:a};
+}
+function hairOpt(ax,id){
+  const t=(HAIR_AXES.find(x=>x.ax===ax)||{}).tab||[];
+  return t.find(o=>o.id===id)||t[0]||{id:id,label:id,nai:''};
+}
+function setHair(ax,id){
+  hairOv[ax]=(id==='__auto')?null:id;
+  if(currentData)renderAppearance(currentData);
+}
+function hairSelHtml(d){
+  const cur=hairSel(d),au=cur.auto;
+  return HAIR_AXES.map(A=>{
+    let h='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:4px 0;">'
+      +'<span style="font-size:9px;color:var(--dim);width:34px;flex-shrink:0;">'+A.ko+'</span>';
+    h+=A.tab.map(o=>{
+      const on=o.id===cur[A.ax],isAu=o.id===au[A.ax];
+      return '<button class="hl-btn" onclick="setHair(\''+A.ax+'\',\''+o.id+'\')" style="padding:4px 9px;border-radius:12px;border:1px solid '+(on?'var(--gold)':'var(--bdr)')+';background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'var(--bg)':'var(--dim)')+';font-size:10px;cursor:pointer;font-weight:'+(on?'700':'400')+';">'+o.label+(isAu?'<span style="opacity:.75;font-size:8px;">✦</span>':'')+'</button>';
+    }).join('');
+    if(hairOv[A.ax])h+='<button onclick="setHair(\''+A.ax+'\',\'__auto\')" title="원국 자동값으로 되돌리기" style="padding:4px 8px;border-radius:12px;border:1px dashed var(--bdr);background:transparent;color:var(--dim);font-size:10px;cursor:pointer;">↺ 자동</button>';
+    return h+'</div>';
+  }).join('')+'<div style="font-size:8px;color:var(--fnt);margin-top:5px;">✦ = 원국 자동 산출값 · 클릭하면 수동 지정 (인물을 새로 뽑으면 자동으로 되돌아감)</div>';
+}
 
 // === 천간·지지 신체 modifier 테이블 (설계서 §4.4 기준) ===
 // 각 항목: [fat, muscle, height(cm), penis, breast, browThick, eyeCorner, pupilSize, pelvis]
@@ -2197,6 +2277,23 @@ function bodyLabel(fat,muscle){
   return['보통 체형','average body'];
 }
 
+// ── 비만도/근육도: 축별 5등급 (바깥 경계 ±0.30 은 bodyLabel 과 동일 — 복합 라벨의 세분화판) ──
+// 반환 [등급명, NAI 기본 태그]
+function fatGrade(fat){
+  if(fat<=-0.30)return['매우마름','thin, skinny body'];
+  if(fat<=-0.12)return['마름','slim body, slender'];
+  if(fat<0.12)return['보통',''];
+  if(fat<0.30)return['통통','slightly chubby, soft body'];
+  return['비만','chubby body, plump, thick body'];
+}
+function muscleGrade(mus){
+  if(mus<=-0.30)return['빈약','frail body, thin limbs'];
+  if(mus<=-0.12)return['여림','slender build, delicate frame'];
+  if(mus<0.12)return['보통',''];
+  if(mus<0.30)return['탄탄','toned body, fit'];
+  return['근육질','muscular, athletic build'];
+}
+
 function heightLabel(hCm,gender,raceId){
   // base.height는 남성 기준 cm — 여성은 실제 남녀 신장비(≈0.92) 적용
   return Math.round(gender==='f'?hCm*0.92:hCm)+'cm';
@@ -2251,12 +2348,15 @@ function renderAppearance(d){
   h+=`<div style="font-size:9px;color:var(--dim);margin:12px 0 4px;letter-spacing:1px;">원국 파생 (수치화 모델)</div>`;
   // fat/muscle 바 표시
   const fatPct=Math.round((bt.fat+1)/2*100),musPct=Math.round((bt.muscle+1)/2*100);
-  h+=`<div style="padding:7px 10px;margin:3px 0;background:var(--card);border:1px solid var(--bdr);border-radius:8px;">`;
-  h+=`<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;font-weight:500;">체형</span><span style="display:flex;align-items:center;font-size:12px;font-weight:700;">${bl[0]}${slotArrowBtn('body')}</span></div>`;
+  const _bk=_pk('body');
+  h+=`<div style="padding:7px 10px;margin:3px 0;background:var(--card);border:1px solid var(--bdr);border-radius:8px;${naiPartOn(_bk)?'':'opacity:.45;'}">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="display:flex;align-items:center;min-width:0;">${slotTogBtn(_bk)}<span style="font-size:11px;font-weight:500;">체형(종합)</span></span><span style="display:flex;align-items:center;font-size:12px;font-weight:700;">${bl[0]}${slotArrowBtn(_bk)}</span></div>`;
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">지방</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${fatPct}%;height:100%;background:linear-gradient(90deg,#3a7bd5,#c44536);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.fat>=0?'+':''}${bt.fat.toFixed(2)}</span></div>`;
   h+=`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="font-size:9px;color:var(--dim);width:28px;">근육</span><div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="width:${musPct}%;height:100%;background:linear-gradient(90deg,#888,#d4a843);border-radius:3px;"></div></div><span style="font-size:9px;color:var(--dim);">${bt.muscle>=0?'+':''}${bt.muscle.toFixed(2)}</span></div>`;
   h+=`</div>`;
-  h+=slotRowEditor(_pk('body'),sdefs[_pk('body')]);
+  h+=slotRowEditor(_bk,sdefs[_bk]);
+  h+=slotRow(_pl('fat'),(bt.fat>=0?'+':'')+bt.fat.toFixed(2),_pk('fat'),sdefs[_pk('fat')]);
+  h+=slotRow(_pl('muscle'),(bt.muscle>=0?'+':'')+bt.muscle.toFixed(2),_pk('muscle'),sdefs[_pk('muscle')]);
   [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
     {l:_pl('butt'),v:'',k:_pk('butt')},{l:_pl('thigh'),v:'',k:_pk('thigh')},
     {l:_pl('waist'),v:'',k:_pk('waist')},{l:_pl('shoulder'),v:'',k:_pk('shoulder')},
@@ -2264,9 +2364,15 @@ function renderAppearance(d){
     {l:_pl('limbs'),v:'',k:_pk('limbs')}
   ]).forEach(t=>{
     h+=slotRow(t.l,t.v,t.k,sdefs[t.k]);});
+  const _hcur=hairSel(d);
+  h+=`<div style="font-size:9px;color:var(--dim);margin:12px 0 4px;letter-spacing:1px;">모발 (원국 자동 산출 · 아래에서 수동 변경 가능)</div>`;
+  HAIR_AXES.forEach(A=>{
+    const k=_pk(A.key);
+    h+=slotRow(_pl(A.key),hairOv[A.ax]?'<span style="color:var(--gold);">수동</span>':'자동',k,sdefs[k]);
+  });
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
-  if(hlSel)hlSel.innerHTML=HAIR_LENS.map(hl=>`<button class="hl-btn" data-hl="${hl.id}" onclick="setHairLen('${hl.id}')" style="padding:5px 12px;border-radius:14px;border:1px solid var(--bdr);background:${hl.id===selectedHairLen?'var(--gold)':'transparent'};color:${hl.id===selectedHairLen?'var(--bg)':'var(--dim)'};font-size:11px;cursor:pointer;font-weight:${hl.id===selectedHairLen?'700':'400'};">${hl.label}</button>`).join('');
+  if(hlSel)hlSel.innerHTML=hairSelHtml(d);
   renderNAI(d);
 }
 function renderNAI(d){
@@ -2907,9 +3013,12 @@ function naiParts(d){
   const _astSp=_ast.sp;
   const ap=arch.data;
   const gdr=d.gender||'m';
-  const bl=bodyLabel(bt.fat,bt.muscle);
-  // ── 등급 변형 토큰: 작음/큼 등 등급이 다르면 서로 다른 프리셋으로 분리 저장 ──
   const vs=x=>String(x||'').replace(/\s+/g,'');
+  const bl=bodyLabel(bt.fat,bt.muscle);
+  const fatG=fatGrade(bt.fat), musG=muscleGrade(bt.muscle);
+  const _hsl=hairSel(d);
+  const _hs={lenO:hairOpt('len',_hsl.len),tieO:hairOpt('tie',_hsl.tie),braidO:hairOpt('braid',_hsl.braid),bangO:hairOpt('bang',_hsl.bang)};
+  // ── 등급 변형 토큰: 작음/큼 등 등급이 다르면 서로 다른 프리셋으로 분리 저장 ──
   const _hd=gdr==='f'?bt.height*0.92:bt.height;   // 성별 보정 표시 키
   const _hb=gdr==='f'?[139,155,169,183]:[150,168,183,198];
   const hV=_hd<_hb[0]?'매우작음':_hd<_hb[1]?'작음':_hd<_hb[2]?'보통':_hd<_hb[3]?'큼':'매우큼';
@@ -2922,9 +3031,15 @@ function naiParts(d){
     {key:'skin',label:'피부색',def:ap.skinNai},
     {key:'hair_col',label:'모발색',def:ap.hairColNai},
     {key:'hair_type',label:'모발 형태',def:ap.hairTypeNai},
+    {key:'hair_len@'+vs(_hs.lenO.label),label:'모발 길이 ['+_hs.lenO.label+']',def:_hs.lenO.nai},
+    {key:'hair_tie@'+vs(_hs.tieO.label),label:'묶음 ['+_hs.tieO.label+']',def:_hs.tieO.nai},
+    {key:'hair_braid@'+vs(_hs.braidO.label),label:'땋음 ['+_hs.braidO.label+']',def:_hs.braidO.nai},
+    {key:'hair_bang@'+vs(_hs.bangO.label),label:'앞머리 ['+_hs.bangO.label+']',def:_hs.bangO.nai},
     {key:'eye_col',label:'눈동자 색',def:ap.eyeColNai},
     {key:'extra',label:'특수(귀·이빨·주근깨)',def:ap.extra||''},
-    {key:'body@'+vs(bl[0]),label:'체형 ['+bl[0]+']',def:bl[1]},
+    {key:'body@'+vs(bl[0]),label:'체형(종합) ['+bl[0]+']',def:''},
+    {key:'fat@'+fatG[0],label:'비만도 ['+fatG[0]+']',def:fatG[1]},
+    {key:'muscle@'+musG[0],label:'근육도 ['+musG[0]+']',def:musG[1]},
     {key:'age_'+_ast.stage,label:'연령대 — '+_ast.label,def:ageStageDefault(_astSp,_ast.stage)},
     {key:'height@'+hV,label:'키/체구 ['+hV+']',def:''},
     {key:'eye_shape@'+vs(eyeV),label:'눈꼬리 ['+eyeV+']',def:bt.eyeC>=0.85?'sharp eyes, narrow eyes':bt.eyeC>=0.5?'upturned eyes':'droopy eyes, downturned eyes'},
@@ -2982,7 +3097,6 @@ function assembleNai(d){
   const style=naiCommon('style');if(style)tags.push(style);
   naiParts(d).forEach(p=>{if(!naiPartOn(p.key))return;const v=slotVal(addr,p.key,p.def);if(v)tags.push(v);});
   const ot=naiOutfitTags(gdr);if(ot)tags.push(ot);   // 복장 상태 (나체/속옷/평상복)
-  const hl=HAIR_LENS.find(h=>h.id===selectedHairLen);if(hl)tags.push(hl.nai);
   const sinA=_calcSinsalAppear(d);
   if(sinA['빛나는 외모'])tags.push('beautiful, attractive');
   if(sinA['치명적 매력'])tags.push('seductive, alluring');
