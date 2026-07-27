@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v16.0 + NAI</title>
+<title>가호록 v17.0 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -322,6 +322,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
 <div class="nav-bar">
   <span class="nav-title">가 호 록</span>
   <div style="display:flex;gap:8px;">
+    <button class="nav-btn" id="nav-studio" style="display:none;" onclick="stOpen()" title="스튜디오 — 라이브러리 NPC · 원료 이미지 · 인페인트 · 프리셋">🎬 스튜디오</button>
     <a class="nav-btn" href="RMMZStudio.html" title="RMMZ Studio로 돌아가기">Studio</a>
     <button class="nav-btn" onclick="location.reload()" title="새로고침">새로고침</button>
   </div>
@@ -4433,7 +4434,7 @@ async function naiUnzip(buf){
 //    · 정체성을 이미지가 담당하므로 외형 태그를 통째로 뺄 수 있다 → 토큰 절약
 //  ※ 원료 절대 파괴 금지 — 저장된 원국·프롬프트·원본 이미지는 그대로 보존한다
 // ═══════════════════════════════════════════════════════════════════
-const LIB_DB='gahorok_lib',LIB_VER=1;
+const LIB_DB='gahorok_lib',LIB_VER=2;
 const CR_SIZES=[[1024,1536],[1536,1024],[1472,1472]];   // NAI 캐릭터 참조 허용 캔버스
 let _libDB=null;
 function libOpen(){
@@ -4445,7 +4446,9 @@ function libOpen(){
       const db=e.target.result;
       if(!db.objectStoreNames.contains('chars'))db.createObjectStore('chars',{keyPath:'id'});
       if(!db.objectStoreNames.contains('scenes'))db.createObjectStore('scenes',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('presets'))db.createObjectStore('presets',{keyPath:'id'});
     };
+    rq.onblocked=function(){rej(new Error('다른 탭에서 라이브러리를 열고 있습니다 — 그 탭을 닫고 새로고침하십시오'));};
     rq.onsuccess=function(){_libDB=rq.result;res(_libDB);};
     rq.onerror=function(){rej(rq.error||new Error('IndexedDB 열기 실패'));};
   });
@@ -4880,6 +4883,22 @@ window.naiDirectGenerate=async function(body,key){
     p.director_reference_strength_values=[typeof body.ref.str==='number'?body.ref.str:1];
     p.director_reference_secondary_strength_values=[1-(typeof body.ref.fid==='number'?body.ref.fid:1)];
     p.director_reference_information_extracted=[1];
+  }
+  // 인페인트(infill) — 전용 모델 + 원본/마스크 첨부.
+  // 마스크는 흰색=다시 그릴 영역. 캐릭터 참조와는 병용하지 않는다(검증되지 않은 조합 = Anlas 낭비).
+  if(body.infill&&body.infill.image&&body.infill.mask){
+    const p=payload.parameters;
+    payload.action='infill';
+    payload.model=/-inpainting$/.test(body.model)?body.model:(body.model+'-inpainting');
+    delete p.director_reference_images;delete p.director_reference_descriptions;
+    delete p.director_reference_strength_values;delete p.director_reference_secondary_strength_values;
+    delete p.director_reference_information_extracted;
+    p.image=body.infill.image;
+    p.mask=body.infill.mask;
+    p.add_original_image=(body.infill.addOriginal!==false);
+    p.extra_noise_seed=seed;
+    if(typeof body.infill.strength==='number')p.strength=body.infill.strength;
+    if(typeof body.infill.noise==='number')p.noise=body.infill.noise;
   }
   const url=(NAI_LS.get('gahorok_proxy_url')||'').trim()||'https://image.novelai.net/ai/generate-image';
   const r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json','Accept':'application/x-zip-compressed'},body:JSON.stringify(payload)});
@@ -5808,6 +5827,777 @@ root.querySelector('#pe-close').addEventListener('click',()=>{
     b.onclick=()=>paintOpen();
     pane.appendChild(b);
   }
+})();
+
+// ═══════════════════════ 스튜디오 (웹 배포 전용) ═══════════════════════
+// 모달이 아니라 #studio 해시 라우트로 열리는 개별 화면.
+// 서버 모드(nai_server.py / :8790)에서는 진입 버튼조차 만들지 않는다.
+(function(){
+if(typeof NAI_SERVER_MODE!=='undefined'&&NAI_SERVER_MODE)return;
+
+const ST_NEG='lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, multiple views, logo, too many watermarks, negative space, blank page';
+// NAI 표준 캔버스 — 인페인트 원본/마스크는 이 중 하나로 리사이즈해 보낸다
+const ST_SIZES=[[832,1216],[1216,832],[1024,1024],[1024,1536],[1536,1024],[1472,1472]];
+const ST_OUTFIT=[['nude','나체'],['topless','상의 탈의'],['underwear','속옷'],['white loincloth','로인클로스'],
+  ['medieval commoner clothes, tunic','평민 튜닉'],['blouse, long skirt, apron','블라우스·치마·앞치마'],
+  ['plate armor','판금 갑옷'],['chainmail','사슬 갑옷'],['leather armor','가죽 갑옷'],['hooded cloak','후드 망토'],
+  ['wizard robe','마법사 로브'],['priest robe','사제복'],['nun habit','수녀복'],['maid outfit','메이드복'],
+  ['noble dress','귀족 드레스'],['ball gown','무도회 드레스'],['tattered rags','누더기'],
+  ['prisoner rags, shackles','죄수복·족쇄'],['fur cloak','모피 망토'],['bandages','붕대']];
+
+const ST={
+  open:false,ready:false,
+  chars:[],q:'',npc:null,
+  useRef:true,refStr:1.0,refFid:1.0,refStyle:false,
+  baseImg:null,baseName:'',
+  maskCv:null,tintCv:null,undo:[],
+  mode:'gen',view:'base',
+  brush:72,erase:false,addOrig:true,strength:0.7,noise:0.0,
+  groups:[],sel:{},free:'',
+  model:'nai-diffusion-4-5-full',res:'auto',steps:28,scale:5,seed:'',
+  outImg:null,outUrl:'',outBlob:null,outSeed:0,
+  busy:false,drawing:false,lx:0,ly:0,rafId:0
+};
+window._ST=ST;
+
+function stId(){return 's'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);}
+function stEsc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function stStatus(t){const e=document.getElementById('sd-status');if(e)e.textContent=t;}
+function $s(id){return document.getElementById(id);}
+
+// ── 스타일 ──
+const _sst=document.createElement('style');
+_sst.textContent=`
+#studio-page{position:fixed;inset:0;background:#0b0c10;z-index:1150;display:none;flex-direction:column;color:#d8d4c8;font-size:12px;font-family:inherit;}
+#studio-page.on{display:flex;}
+.sd-top{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #23252e;background:#111219;flex:0 0 auto;}
+.sd-top .sd-ttl{font-size:13px;letter-spacing:3px;color:#c8a96a;font-weight:700;}
+.sd-top .sd-sub{font-size:10px;color:#6a6558;flex:1;}
+.sd-body{flex:1;display:flex;min-height:0;}
+.sd-col{overflow-y:auto;overflow-x:hidden;padding:10px;}
+.sd-l{width:308px;flex:0 0 308px;border-right:1px solid #23252e;background:#0e0f15;}
+.sd-c{flex:1;min-width:0;display:flex;flex-direction:column;background:#08090d;}
+.sd-r{width:330px;flex:0 0 330px;border-left:1px solid #23252e;background:#0e0f15;}
+.sd-btn{background:#171922;border:1px solid #2c2f3b;color:#d8d4c8;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;font-family:inherit;}
+.sd-btn:hover{border-color:#c8a96a;color:#f0e6d2;}
+.sd-btn.pri{background:#3a2f1a;border-color:#c8a96a;color:#f0d9a8;}
+.sd-btn.on{background:#3a2f1a;border-color:#c8a96a;color:#f0d9a8;}
+.sd-btn:disabled{opacity:.45;cursor:not-allowed;}
+.sd-h{font-size:10px;letter-spacing:2px;color:#8a8778;margin:13px 0 6px;border-bottom:1px solid #23252e;padding-bottom:3px;}
+.sd-h.first{margin-top:0;}
+.sd-in{width:100%;background:#0a0b10;border:1px solid #2c2f3b;border-radius:5px;color:#d8d4c8;font-size:11px;padding:5px 7px;font-family:inherit;box-sizing:border-box;}
+.sd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.sd-card{background:#12141c;border:1px solid #23252e;border-radius:6px;padding:4px;cursor:pointer;text-align:center;}
+.sd-card:hover{border-color:#6a6558;}
+.sd-card.on{border-color:#c8a96a;background:#1d1a14;}
+.sd-card img{width:100%;height:62px;object-fit:cover;border-radius:4px;display:block;background:#000;}
+.sd-card .sd-nm{font-size:9px;margin-top:3px;color:#b6b2a6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sd-row{display:flex;align-items:center;gap:6px;margin:5px 0;}
+.sd-row>label{font-size:10px;color:#8a8778;flex:0 0 62px;}
+.sd-row input[type=range]{flex:1;min-width:0;}
+.sd-v{font-size:10px;color:#c8a96a;min-width:34px;text-align:right;}
+.sd-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:10px;}
+#sd-cv{max-width:100%;max-height:100%;display:none;background:#000;touch-action:none;box-shadow:0 0 0 1px #23252e;cursor:crosshair;}
+#sd-cv.nopaint{cursor:default;}
+.sd-empty{color:#5a5850;font-size:12px;text-align:center;line-height:2;padding:20px;}
+.sd-bot{flex:0 0 auto;border-top:1px solid #23252e;background:#111219;padding:8px 12px;}
+.sd-opts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.sd-opts select,.sd-opts input{background:#0a0b10;border:1px solid #2c2f3b;border-radius:5px;color:#d8d4c8;font-size:10px;padding:4px 6px;font-family:inherit;}
+.sd-strip{display:flex;gap:5px;overflow-x:auto;margin-top:7px;}
+.sd-strip img{height:50px;border-radius:4px;border:1px solid #23252e;cursor:pointer;background:#000;flex:0 0 auto;}
+.sd-strip img.on{border-color:#c8a96a;}
+.sd-g{border:1px solid #23252e;border-radius:6px;margin-bottom:7px;background:#12141c;overflow:hidden;}
+.sd-gh{display:flex;align-items:center;gap:5px;padding:6px 7px;background:#171922;}
+.sd-gh .sd-tw{color:#c8a96a;font-size:10px;width:12px;cursor:pointer;}
+.sd-gh .sd-tt{flex:1;font-size:11px;color:#d8d4c8;font-weight:600;cursor:pointer;}
+.sd-gh .sd-ct{font-size:9px;color:#8a8778;}
+.sd-gb{padding:7px;display:flex;flex-wrap:wrap;gap:4px;}
+.sd-chip{background:#0a0b10;border:1px solid #2c2f3b;border-radius:11px;padding:3px 8px;font-size:10px;color:#b6b2a6;cursor:pointer;user-select:none;}
+.sd-chip:hover{border-color:#6a6558;}
+.sd-chip.on{background:#3a2f1a;border-color:#c8a96a;color:#f0d9a8;}
+.sd-chip .sd-x{margin-left:5px;color:#4a4840;font-size:9px;}
+.sd-chip .sd-x:hover{color:#c44536;}
+.sd-mini{background:none;border:none;color:#8a8778;font-size:11px;cursor:pointer;padding:0 3px;font-family:inherit;}
+.sd-mini:hover{color:#c8a96a;}
+.sd-tag{font-size:9px;color:#7a7668;word-break:break-word;line-height:1.7;background:#0a0b10;border:1px solid #23252e;border-radius:5px;padding:6px;max-height:80px;overflow-y:auto;}
+.sd-seg{display:flex;border:1px solid #2c2f3b;border-radius:5px;overflow:hidden;}
+.sd-seg button{flex:1;background:#0a0b10;border:none;color:#8a8778;font-size:10px;padding:5px;cursor:pointer;font-family:inherit;}
+.sd-seg button.on{background:#3a2f1a;color:#f0d9a8;}
+.sd-note{font-size:9px;color:#6a6558;line-height:1.7;margin-top:5px;}
+@media(max-width:1180px){.sd-l{width:250px;flex:0 0 250px;}.sd-r{width:266px;flex:0 0 266px;}}
+`;
+document.head.appendChild(_sst);
+
+// ── 뼈대 ──
+const root=document.createElement('div');
+root.id='studio-page';
+root.innerHTML=
+ '<div class="sd-top">'
+  +'<span class="sd-ttl">S T U D I O</span>'
+  +'<span class="sd-sub">라이브러리 인물 · 원료 이미지 · 인페인트 · 프리셋</span>'
+  +'<button class="sd-btn" onclick="stResetPresets()" title="프리셋 열을 기본값으로">↺ 프리셋 초기화</button>'
+  +'<button class="sd-btn" onclick="stClose()">✕ 닫기</button>'
+ +'</div>'
+ +'<div class="sd-body">'
+  +'<div class="sd-col sd-l" id="sd-left"></div>'
+  +'<div class="sd-c">'
+    +'<div class="sd-stage" id="sd-stage"><canvas id="sd-cv"></canvas><div class="sd-empty" id="sd-empty"></div></div>'
+    +'<div class="sd-bot" id="sd-bottom"></div>'
+  +'</div>'
+  +'<div class="sd-col sd-r" id="sd-right"></div>'
+ +'</div>';
+document.body.appendChild(root);
+
+// ── 프리셋 열 ─────────────────────────────────────────────────────
+function stPairs(a){return (a||[]).filter(function(x){return x&&x[0];}).map(function(x){return{id:stId(),label:x[1],tag:x[0]};});}
+function stSeed(){
+  const W=window;
+  return[
+    {id:stId(),title:'복장',open:true,items:stPairs(ST_OUTFIT)},
+    {id:stId(),title:'구도',open:true,items:stPairs(W.LIB_SHOT)},
+    {id:stId(),title:'자세',open:true,items:stPairs(W.LIB_POSE)},
+    {id:stId(),title:'표정·시선',open:false,items:stPairs(W.LIB_EXPR)},
+    {id:stId(),title:'배경',open:false,items:stPairs(W.LIB_BG)},
+    {id:stId(),title:'조명',open:false,items:stPairs(W.LIB_LIGHT)}
+  ];
+}
+async function stLoadGroups(){
+  try{
+    const d=await libGet('presets','groups');
+    if(d&&d.groups&&d.groups.length){ST.groups=d.groups;return;}
+  }catch(e){}
+  ST.groups=stSeed();
+  stSaveGroups();
+}
+function stSaveGroups(){
+  // IndexedDB 쓰기는 비동기다. 직후에 새로고침·탭 닫기가 오면 마지막 편집이 날아갈 수 있어
+  // 진행 중 쓰기를 붙잡아 두고, 페이지를 떠날 때 한 번 더 밀어 넣는다.
+  try{ST.saving=libPut('presets',{id:'groups',groups:ST.groups,ts:Date.now()});}catch(e){}
+  return ST.saving;
+}
+window.stFlush=function(){return Promise.resolve(ST.saving).catch(function(){});};
+window.addEventListener('pagehide',function(){if(ST.ready)stSaveGroups();});
+window.stResetPresets=function(){
+  if(!confirm('프리셋 열을 기본값으로 되돌립니다. 직접 추가한 칸은 사라집니다.'))return;
+  ST.groups=stSeed();ST.sel={};stSaveGroups();stRight();stBottom();
+};
+window.stGroupToggle=function(gid){
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;g.open=!g.open;stSaveGroups();stRight();
+};
+window.stGroupAdd=function(){
+  const t=prompt('새 프리셋 열 이름','새 항목');
+  if(t===null)return;
+  ST.groups.push({id:stId(),title:String(t).trim()||'새 항목',open:true,items:[]});
+  stSaveGroups();stRight();
+};
+window.stGroupRename=function(gid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;
+  const t=prompt('열 이름',g.title);
+  if(t===null)return;
+  g.title=String(t).trim()||g.title;stSaveGroups();stRight();
+};
+window.stGroupDel=function(gid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;
+  if(!confirm('"'+g.title+'" 열을 지웁니다.'))return;
+  ST.groups=ST.groups.filter(function(x){return x.id!==gid;});
+  delete ST.sel[gid];stSaveGroups();stRight();stBottom();
+};
+window.stChipAdd=function(gid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;
+  const tag=prompt('NAI 태그 (영문)');
+  if(tag===null||!String(tag).trim())return;
+  const lb=prompt('표시 이름 (한글)',String(tag).trim());
+  if(lb===null)return;
+  g.items.push({id:stId(),label:String(lb).trim()||String(tag).trim(),tag:String(tag).trim()});
+  g.open=true;stSaveGroups();stRight();
+};
+window.stChipDel=function(gid,iid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;
+  g.items=g.items.filter(function(x){return x.id!==iid;});
+  if(ST.sel[gid])ST.sel[gid]=ST.sel[gid].filter(function(x){return x!==iid;});
+  stSaveGroups();stRight();stBottom();
+};
+window.stChipToggle=function(gid,iid){
+  const cur=ST.sel[gid]||[];
+  ST.sel[gid]=(cur.indexOf(iid)>=0)?cur.filter(function(x){return x!==iid;}):cur.concat([iid]);
+  stRight();stBottom();
+};
+window.stFree=function(v){ST.free=String(v||'');stBottom();};
+
+function stRight(){
+  const el=$s('sd-right');if(!el)return;
+  let h='<div class="sd-h first">프 리 셋 열</div>';
+  ST.groups.forEach(function(g){
+    const sel=ST.sel[g.id]||[];
+    h+='<div class="sd-g">'
+      +'<div class="sd-gh">'
+        +'<span class="sd-tw" onclick="stGroupToggle(\''+g.id+'\')">'+(g.open?'▾':'▸')+'</span>'
+        +'<span class="sd-tt" onclick="stGroupToggle(\''+g.id+'\')" ondblclick="stGroupRename(\''+g.id+'\',event)">'+stEsc(g.title)+'</span>'
+        +'<span class="sd-ct">'+(sel.length?(sel.length+'/'+g.items.length):g.items.length)+'</span>'
+        +'<button class="sd-mini" title="칩 추가" onclick="stChipAdd(\''+g.id+'\',event)">＋</button>'
+        +'<button class="sd-mini" title="이름 변경" onclick="stGroupRename(\''+g.id+'\',event)">✎</button>'
+        +'<button class="sd-mini" title="열 삭제" onclick="stGroupDel(\''+g.id+'\',event)">✕</button>'
+      +'</div>';
+    if(g.open){
+      h+='<div class="sd-gb">';
+      if(!g.items.length)h+='<span style="font-size:10px;color:#5a5850;">＋ 로 칩을 추가하십시오</span>';
+      g.items.forEach(function(it){
+        h+='<span class="sd-chip'+(sel.indexOf(it.id)>=0?' on':'')+'" title="'+stEsc(it.tag)+'" onclick="stChipToggle(\''+g.id+'\',\''+it.id+'\')">'
+          +stEsc(it.label)+'<span class="sd-x" onclick="stChipDel(\''+g.id+'\',\''+it.id+'\',event)">✕</span></span>';
+      });
+      h+='</div>';
+    }
+    h+='</div>';
+  });
+  h+='<button class="sd-btn" style="width:100%;" onclick="stGroupAdd()">＋ 새 프리셋 열</button>';
+  h+='<div class="sd-h">자 유 태 그</div>'
+    +'<textarea class="sd-in" id="sd-free" rows="3" placeholder="쉼표로 구분 · 여기 넣은 태그가 마지막에 붙습니다" oninput="stFree(this.value)">'+stEsc(ST.free)+'</textarea>';
+  el.innerHTML=h;
+}
+
+function stChipTags(){
+  const out=[];
+  ST.groups.forEach(function(g){
+    const sel=ST.sel[g.id]||[];
+    g.items.forEach(function(it){if(sel.indexOf(it.id)>=0)out.push(it.tag);});
+  });
+  return out;
+}
+
+// ── 프롬프트 조립 ──────────────────────────────────────────────────
+function stPrompt(){
+  const parts=[];
+  // 참조를 쓰면 인물 정체성은 이미지가 담당 → 외형 태그를 빼서 토큰을 아낀다
+  if(ST.npc&&ST.npc.idPrompt&&!(ST.useRef&&ST.npc.ref))parts.push(ST.npc.idPrompt);
+  stChipTags().forEach(function(t){parts.push(t);});
+  if(ST.free.trim())parts.push(ST.free.trim());
+  return parts.join(', ').replace(/,\s*,/g,',').trim();
+}
+window.stPromptText=stPrompt;
+
+// ── 이미지 유틸 ────────────────────────────────────────────────────
+function stPickSize(){
+  if(ST.res!=='auto'){const p=ST.res.split('x');return[parseInt(p[0]),parseInt(p[1])];}
+  const im=ST.baseImg||ST.outImg;
+  if(!im)return[832,1216];
+  const a=(im.naturalWidth||im.width)/(im.naturalHeight||im.height);
+  let best=ST_SIZES[0],bd=Infinity;
+  ST_SIZES.forEach(function(z){const d=Math.abs(z[0]/z[1]-a);if(d<bd){bd=d;best=z;}});
+  return best;
+}
+window.stPickSize=stPickSize;
+
+function stImgB64(W,H){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const g=c.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,W,H);
+  if(ST.baseImg)g.drawImage(ST.baseImg,0,0,W,H);
+  return c.toDataURL('image/png').split(',')[1];
+}
+// NAI V4 마스크 규격: ceil(변/64)*8 로 축소 → 8배 nearest 확대 → 8x8 블록 양자화 RGBA
+function stMaskB64(W,H){
+  const mw=Math.ceil(W/64)*8,mh=Math.ceil(H/64)*8;
+  const sm=document.createElement('canvas');sm.width=mw;sm.height=mh;
+  const sg=sm.getContext('2d');
+  sg.imageSmoothingEnabled=true;                      // 가는 획이 사라지지 않게 면적 평균
+  if(ST.maskCv)sg.drawImage(ST.maskCv,0,0,mw,mh);
+  const bg=document.createElement('canvas');bg.width=mw*8;bg.height=mh*8;
+  const bc=bg.getContext('2d');bc.imageSmoothingEnabled=false;   // 블록 경계 유지
+  bc.drawImage(sm,0,0,bg.width,bg.height);
+  const id=bc.getImageData(0,0,bg.width,bg.height),d=id.data;
+  for(let i=0;i<d.length;i+=4){
+    const on=d[i+3]>0&&(d[i]+d[i+1]+d[i+2])>0;
+    d[i]=d[i+1]=d[i+2]=on?255:0;d[i+3]=on?255:0;
+  }
+  bc.putImageData(id,0,0);
+  return bg.toDataURL('image/png').split(',')[1];
+}
+window.stImgB64=stImgB64;window.stMaskB64=stMaskB64;
+
+function stMaskHas(){
+  if(!ST.maskCv)return false;
+  const w=Math.min(160,ST.maskCv.width),h=Math.min(160,ST.maskCv.height);
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const g=c.getContext('2d');g.drawImage(ST.maskCv,0,0,w,h);
+  const d=g.getImageData(0,0,w,h).data;
+  for(let i=3;i<d.length;i+=4)if(d[i]>8)return true;
+  return false;
+}
+window.stMaskHas=stMaskHas;
+
+function stMaskInit(w,h){
+  ST.maskCv=document.createElement('canvas');ST.maskCv.width=w;ST.maskCv.height=h;
+  ST.tintCv=document.createElement('canvas');ST.tintCv.width=w;ST.tintCv.height=h;
+  ST.undo=[];stTint();
+}
+function stTint(){
+  if(!ST.maskCv||!ST.tintCv)return;
+  const g=ST.tintCv.getContext('2d');
+  g.globalCompositeOperation='copy';g.drawImage(ST.maskCv,0,0);
+  g.globalCompositeOperation='source-in';g.fillStyle='#ff3b30';
+  g.fillRect(0,0,ST.tintCv.width,ST.tintCv.height);
+  g.globalCompositeOperation='source-over';
+}
+function stSnap(){
+  if(!ST.maskCv)return;
+  const c=document.createElement('canvas');c.width=ST.maskCv.width;c.height=ST.maskCv.height;
+  c.getContext('2d').drawImage(ST.maskCv,0,0);
+  ST.undo.push(c);if(ST.undo.length>12)ST.undo.shift();
+}
+window.stMaskUndo=function(){
+  const c=ST.undo.pop();if(!c||!ST.maskCv)return;
+  const g=ST.maskCv.getContext('2d');
+  g.globalCompositeOperation='copy';g.drawImage(c,0,0);g.globalCompositeOperation='source-over';
+  stTint();stDraw();stLeft();
+};
+window.stMaskClear=function(){
+  if(!ST.maskCv)return;
+  stSnap();
+  ST.maskCv.getContext('2d').clearRect(0,0,ST.maskCv.width,ST.maskCv.height);
+  stTint();stDraw();stLeft();
+};
+window.stMaskInvert=function(){
+  if(!ST.maskCv)return;
+  stSnap();
+  const w=ST.maskCv.width,h=ST.maskCv.height;
+  const t=document.createElement('canvas');t.width=w;t.height=h;
+  const tg=t.getContext('2d');
+  tg.fillStyle='#fff';tg.fillRect(0,0,w,h);
+  tg.globalCompositeOperation='destination-out';tg.drawImage(ST.maskCv,0,0);
+  const g=ST.maskCv.getContext('2d');
+  g.globalCompositeOperation='copy';g.drawImage(t,0,0);g.globalCompositeOperation='source-over';
+  stTint();stDraw();stLeft();
+};
+
+// ── 미리보기 ───────────────────────────────────────────────────────
+function stNeedDraw(){
+  if(ST.rafId)return;
+  ST.rafId=requestAnimationFrame(function(){ST.rafId=0;stDraw();});
+}
+function stDraw(){
+  const cv=$s('sd-cv'),em=$s('sd-empty'),stg=$s('sd-stage');
+  if(!cv||!stg)return;
+  const src=(ST.view==='out'&&ST.outImg)?ST.outImg:ST.baseImg;
+  if(!src){
+    cv.style.display='none';
+    if(em){em.style.display='block';
+      em.innerHTML=ST.chars.length
+        ?'왼쪽에서 인물을 고르십시오.<br><span style="font-size:10px;">참조로 쓰면 외형 태그 없이 같은 얼굴이 나옵니다 — 원료 이미지로 올리면 인페인트가 열립니다.</span>'
+        :'라이브러리가 비어 있습니다.<br><span style="font-size:10px;">가호록 본 화면에서 이미지를 만든 뒤 📚 라이브러리에 보관하십시오.</span>';}
+    return;
+  }
+  if(em)em.style.display='none';
+  cv.style.display='block';
+  const iw=src.naturalWidth||src.width,ih=src.naturalHeight||src.height;
+  const aw=Math.max(80,stg.clientWidth-20),ah=Math.max(80,stg.clientHeight-20);
+  const sc=Math.min(aw/iw,ah/ih);
+  if(cv.width!==iw)cv.width=iw;
+  if(cv.height!==ih)cv.height=ih;
+  cv.style.width=Math.round(iw*sc)+'px';cv.style.height=Math.round(ih*sc)+'px';
+  const paint=(ST.view==='base'&&ST.mode==='infill'&&!!ST.maskCv);
+  cv.className=paint?'':'nopaint';
+  const g=cv.getContext('2d');
+  g.clearRect(0,0,iw,ih);
+  g.drawImage(src,0,0,iw,ih);
+  if(paint){
+    g.save();g.globalAlpha=0.45;g.drawImage(ST.tintCv,0,0,iw,ih);g.restore();
+  }
+}
+window.stDraw=stDraw;
+window.addEventListener('resize',function(){if(ST.open)stNeedDraw();});
+
+// ── 마스크 칠하기 ──────────────────────────────────────────────────
+function stXY(e){
+  const cv=$s('sd-cv'),r=cv.getBoundingClientRect();
+  return{x:(e.clientX-r.left)*(cv.width/Math.max(1,r.width)),
+         y:(e.clientY-r.top)*(cv.height/Math.max(1,r.height))};
+}
+function stStroke(x0,y0,x1,y1){
+  if(!ST.maskCv)return;
+  const g=ST.maskCv.getContext('2d');
+  // 표시 캔버스는 이미지 원본 해상도, 마스크도 같은 해상도라 좌표 변환이 필요 없다
+  g.globalCompositeOperation=ST.erase?'destination-out':'source-over';
+  g.strokeStyle='#fff';g.fillStyle='#fff';
+  g.lineWidth=ST.brush;g.lineCap='round';g.lineJoin='round';
+  g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();
+  g.globalCompositeOperation='source-over';
+  stTint();
+}
+function stCanPaint(){return ST.view==='base'&&ST.mode==='infill'&&!!ST.maskCv&&!!ST.baseImg;}
+root.addEventListener('pointerdown',function(e){
+  if(e.target.id!=='sd-cv'||!stCanPaint())return;
+  e.preventDefault();
+  stSnap();
+  const p=stXY(e);ST.drawing=true;ST.lx=p.x;ST.ly=p.y;
+  stStroke(p.x,p.y,p.x,p.y);stNeedDraw();
+  try{e.target.setPointerCapture(e.pointerId);}catch(err){}
+});
+root.addEventListener('pointermove',function(e){
+  if(!ST.drawing)return;
+  e.preventDefault();
+  const p=stXY(e);stStroke(ST.lx,ST.ly,p.x,p.y);ST.lx=p.x;ST.ly=p.y;stNeedDraw();
+});
+function stUp(){if(!ST.drawing)return;ST.drawing=false;stNeedDraw();stLeft();}
+root.addEventListener('pointerup',stUp);
+root.addEventListener('pointercancel',stUp);
+root.addEventListener('pointerleave',stUp);
+
+// ── 좌측 패널 ──────────────────────────────────────────────────────
+window.stSearch=function(v){ST.q=String(v||'').toLowerCase();stLeft(true);};
+window.stPick=async function(id){
+  try{
+    const e=await libGet('chars',id);
+    if(!e){stStatus('항목을 찾을 수 없습니다');return;}
+    ST.npc={id:e.id,name:e.name,thumb:e.thumb,ref:e.ref,w:e.w,h:e.h,
+      idPrompt:e.idPrompt||'',race:e.race||'',gender:e.gender||'',memo:e.memo||'',seed:e.seed||0};
+    stStatus('인물: '+e.name+(ST.useRef?' — 참조로 사용 중 (외형 태그 생략)':''));
+    stLeft();stBottom();
+  }catch(err){stStatus('불러오기 실패: '+((err&&err.message)||err));}
+};
+window.stUseRefToggle=function(b){ST.useRef=!!b;stLeft();stBottom();};
+window.stSetRef=function(k,v){
+  if(k==='str')ST.refStr=Math.max(0,Math.min(1,parseFloat(v)||0));
+  else if(k==='fid')ST.refFid=Math.max(0,Math.min(1,parseFloat(v)||0));
+  else if(k==='style')ST.refStyle=!!v;
+  stLeft();
+};
+async function stSetBase(src,name){
+  try{
+    const im=await libLoadImg(src);
+    ST.baseImg=im;ST.baseName=name||'원료';
+    stMaskInit(im.naturalWidth||im.width,im.naturalHeight||im.height);
+    ST.view='base';
+    if(ST.mode!=='infill')stStatus('원료 이미지: '+ST.baseName+' — 인페인트 모드로 전환하면 마스크를 칠할 수 있습니다');
+    else stStatus('원료 이미지: '+ST.baseName+' — 고칠 영역을 칠하십시오');
+    stLeft();stBottom();stNeedDraw();
+  }catch(e){stStatus('원료 이미지를 읽지 못했습니다: '+((e&&e.message)||e));}
+}
+window.stSetBase=stSetBase;
+window.stBaseFrom=async function(what){
+  if(what==='npc'){
+    if(!ST.npc||!ST.npc.ref){stStatus('먼저 인물을 고르십시오');return;}
+    await stSetBase(ST.npc.ref,ST.npc.name);
+  }else if(what==='out'){
+    if(!ST.outUrl){stStatus('결과 이미지가 없습니다');return;}
+    await stSetBase(ST.outUrl,(ST.npc&&ST.npc.name)||'결과');
+  }else if(what==='gallery'){
+    const outs=window.naiOutputs||[];
+    if(!outs.length){stStatus('세션 갤러리가 비어 있습니다');return;}
+    const o=outs[outs.length-1];
+    await stSetBase(o.url,o.name||'갤러리');
+  }else if(what==='clear'){
+    ST.baseImg=null;ST.maskCv=null;ST.tintCv=null;ST.undo=[];ST.mode='gen';ST.view='base';
+    stStatus('원료 이미지를 내렸습니다');stLeft();stBottom();stNeedDraw();
+  }
+};
+window.stBaseFile=function(inp){
+  const f=inp&&inp.files&&inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=function(){stSetBase(r.result,f.name.replace(/\.[^.]+$/,''));};
+  r.readAsDataURL(f);
+  inp.value='';
+};
+window.stMode=function(m){
+  if(m==='infill'&&!ST.baseImg){stStatus('인페인트에는 원료 이미지가 필요합니다');return;}
+  ST.mode=(m==='infill')?'infill':'gen';
+  if(ST.mode==='infill')ST.view='base';
+  stLeft();stBottom();stNeedDraw();
+};
+window.stBrush=function(v){ST.brush=Math.max(4,Math.min(400,parseInt(v)||72));stLeft();};
+window.stErase=function(b){ST.erase=!!b;stLeft();};
+window.stAddOrig=function(b){ST.addOrig=!!b;stLeft();};
+window.stInfSet=function(k,v){
+  if(k==='strength')ST.strength=Math.max(0.01,Math.min(0.99,parseFloat(v)||0.7));
+  else if(k==='noise')ST.noise=Math.max(0,Math.min(0.99,parseFloat(v)||0));
+  stLeft();
+};
+
+function stLeft(keepFocus){
+  const el=$s('sd-left');if(!el)return;
+  const q=ST.q;
+  const list=ST.chars.filter(function(c){
+    if(!q)return true;
+    return (c.name||'').toLowerCase().indexOf(q)>=0||(c.memo||'').toLowerCase().indexOf(q)>=0;
+  });
+  let h='<div class="sd-h first">라 이 브 러 리  ·  '+ST.chars.length+'명</div>'
+    +'<input class="sd-in" id="sd-q" placeholder="이름·메모 검색" value="'+stEsc(ST.q)+'" oninput="stSearch(this.value)">'
+    +'<div class="sd-grid" style="margin-top:7px;">';
+  if(!list.length)h+='<div style="grid-column:1/-1;font-size:10px;color:#5a5850;padding:8px 0;">'+(ST.chars.length?'검색 결과 없음':'보관된 인물이 없습니다')+'</div>';
+  list.forEach(function(c){
+    h+='<div class="sd-card'+(ST.npc&&ST.npc.id===c.id?' on':'')+'" onclick="stPick(\''+c.id+'\')" title="'+stEsc(c.name)+'">'
+      +'<img src="'+(c.thumb||'')+'" alt=""><div class="sd-nm">'+stEsc(c.name)+'</div></div>';
+  });
+  h+='</div>';
+
+  if(ST.npc){
+    h+='<div class="sd-h">선 택 된 인 물</div>'
+      +'<div style="font-size:11px;color:#f0e6d2;">'+stEsc(ST.npc.name)+'</div>'
+      +'<div style="font-size:9px;color:#6a6558;margin-top:2px;">'+stEsc((window.libRaceKo?libRaceKo(ST.npc.race):ST.npc.race)||'')+(ST.npc.gender?(' · '+(ST.npc.gender==='f'?'여':'남')):'')+'</div>'
+      +'<label class="sd-row" style="margin-top:7px;"><input type="checkbox" '+(ST.useRef?'checked':'')+' onchange="stUseRefToggle(this.checked)"><span style="font-size:10px;color:#b6b2a6;">캐릭터 참조로 사용 (Anlas +5)</span></label>';
+    if(ST.useRef){
+      h+='<div class="sd-row"><label>강도</label><input type="range" min="0" max="1" step="0.05" value="'+ST.refStr+'" oninput="stSetRef(\'str\',this.value)"><span class="sd-v">'+ST.refStr.toFixed(2)+'</span></div>'
+        +'<div class="sd-row"><label>정밀도</label><input type="range" min="0" max="1" step="0.05" value="'+ST.refFid+'" oninput="stSetRef(\'fid\',this.value)"><span class="sd-v">'+ST.refFid.toFixed(2)+'</span></div>'
+        +'<label class="sd-row"><input type="checkbox" '+(ST.refStyle?'checked':'')+' onchange="stSetRef(\'style\',this.checked)"><span style="font-size:10px;color:#b6b2a6;">화풍까지 복사</span></label>'
+        +'<div class="sd-note">참조를 켜면 외형 태그를 프롬프트에서 뺍니다 — 토큰이 줄고 인물이 더 잘 지켜집니다.</div>';
+    }
+  }
+
+  h+='<div class="sd-h">원 료 이 미 지</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:5px;">'
+    +'<button class="sd-btn" onclick="stBaseFrom(\'npc\')">선택 인물</button>'
+    +'<button class="sd-btn" onclick="stBaseFrom(\'gallery\')">갤러리 최신</button>'
+    +'<button class="sd-btn" onclick="stBaseFrom(\'out\')">현재 결과</button>'
+    +'<button class="sd-btn" onclick="document.getElementById(\'sd-file\').click()">파일…</button>'
+    +(ST.baseImg?'<button class="sd-btn" onclick="stBaseFrom(\'clear\')">내리기</button>':'')
+    +'</div>'
+    +'<input type="file" id="sd-file" accept="image/*" style="display:none;" onchange="stBaseFile(this)">';
+  if(ST.baseImg){
+    h+='<div class="sd-note">'+stEsc(ST.baseName)+' · '+(ST.baseImg.naturalWidth||ST.baseImg.width)+'×'+(ST.baseImg.naturalHeight||ST.baseImg.height)+'</div>';
+  }else{
+    h+='<div class="sd-note">원료 이미지를 올리면 인페인트를 쓸 수 있습니다.</div>';
+  }
+
+  h+='<div class="sd-h">모 드</div>'
+    +'<div class="sd-seg">'
+      +'<button class="'+(ST.mode==='gen'?'on':'')+'" onclick="stMode(\'gen\')">생성</button>'
+      +'<button class="'+(ST.mode==='infill'?'on':'')+'" onclick="stMode(\'infill\')">인페인트</button>'
+    +'</div>';
+
+  if(ST.mode==='infill'&&ST.baseImg){
+    h+='<div class="sd-h">인 페 인 트  마 스 크</div>'
+      +'<div class="sd-row"><label>붓 굵기</label><input type="range" min="4" max="400" step="2" value="'+ST.brush+'" oninput="stBrush(this.value)"><span class="sd-v">'+ST.brush+'</span></div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:5px;">'
+        +'<button class="sd-btn'+(ST.erase?'':' on')+'" onclick="stErase(false)">✏️ 칠하기</button>'
+        +'<button class="sd-btn'+(ST.erase?' on':'')+'" onclick="stErase(true)">🧽 지우개</button>'
+        +'<button class="sd-btn" onclick="stMaskUndo()"'+(ST.undo.length?'':' disabled')+'>↶ 되돌리기</button>'
+        +'<button class="sd-btn" onclick="stMaskInvert()">⇄ 반전</button>'
+        +'<button class="sd-btn" onclick="stMaskClear()">✕ 비우기</button>'
+      +'</div>'
+      +'<label class="sd-row" style="margin-top:6px;"><input type="checkbox" '+(ST.addOrig?'checked':'')+' onchange="stAddOrig(this.checked)"><span style="font-size:10px;color:#b6b2a6;">마스크 밖은 원본 유지</span></label>'
+      +'<div class="sd-row"><label>변형 강도</label><input type="range" min="0.05" max="0.99" step="0.01" value="'+ST.strength+'" oninput="stInfSet(\'strength\',this.value)"><span class="sd-v">'+ST.strength.toFixed(2)+'</span></div>'
+      +'<div class="sd-row"><label>노이즈</label><input type="range" min="0" max="0.5" step="0.01" value="'+ST.noise+'" oninput="stInfSet(\'noise\',this.value)"><span class="sd-v">'+ST.noise.toFixed(2)+'</span></div>'
+      +'<div class="sd-note">붉게 칠한 곳만 다시 그립니다. 인페인트는 전용 모델(-inpainting)로 전송되며 캐릭터 참조와는 함께 쓰지 않습니다.</div>';
+  }
+
+  h+='<div class="sd-h">캔 버 스</div>'
+    +'<button class="sd-btn" style="width:100%;" onclick="stPaint()">✏️ 캔버스 편집기 열기</button>'
+    +'<div class="sd-note">레이어·블렌드·선택 영역이 필요한 정밀 수정은 캔버스 편집기에서. 내보내면 세션 갤러리로 들어옵니다.</div>';
+
+  el.innerHTML=h;
+  if(keepFocus){const q2=$s('sd-q');if(q2){q2.focus();q2.setSelectionRange(q2.value.length,q2.value.length);}}
+}
+window.stPaint=function(){
+  if(typeof window.paintOpen!=='function'){stStatus('캔버스 편집기를 찾지 못했습니다');return;}
+  paintOpen();
+};
+
+// ── 하단 바 ────────────────────────────────────────────────────────
+window.stOpt=function(k,v){
+  if(k==='model')ST.model=v;
+  else if(k==='res')ST.res=v;
+  else if(k==='steps')ST.steps=Math.max(1,Math.min(28,parseInt(v)||28));
+  else if(k==='scale')ST.scale=Math.max(1,Math.min(10,parseFloat(v)||5));
+  else if(k==='seed')ST.seed=String(v||'').trim();
+  stBottom();
+};
+window.stStripPick=function(i){
+  const outs=window.naiOutputs||[];const o=outs[i];if(!o)return;
+  libLoadImg(o.url).then(function(im){
+    ST.outImg=im;ST.outUrl=o.url;ST.outBlob=o.blob||null;ST.outSeed=o.seed||0;
+    ST.view='out';stBottom();stNeedDraw();
+  });
+};
+window.stView=function(v){
+  if(v==='out'&&!ST.outImg)return;
+  if(v==='base'&&!ST.baseImg)return;
+  ST.view=v;stBottom();stNeedDraw();
+};
+
+function stBottom(){
+  const el=$s('sd-bottom');if(!el)return;
+  const sz=stPickSize();
+  const pr=stPrompt();
+  const outs=window.naiOutputs||[];
+  let h='<div class="sd-tag" title="전송될 프롬프트">'+(pr?stEsc(pr):'<span style="color:#5a5850;">프롬프트가 비어 있습니다 — 인물을 고르거나 프리셋 칩을 켜십시오</span>')+'</div>'
+    +'<div class="sd-opts" style="margin-top:7px;">'
+      +'<select onchange="stOpt(\'model\',this.value)">'
+        +'<option value="nai-diffusion-4-5-full"'+(ST.model==='nai-diffusion-4-5-full'?' selected':'')+'>v4.5 Full</option>'
+        +'<option value="nai-diffusion-4-5-curated"'+(ST.model==='nai-diffusion-4-5-curated'?' selected':'')+'>v4.5 Curated</option>'
+      +'</select>'
+      +'<select onchange="stOpt(\'res\',this.value)" title="해상도">'
+        +'<option value="auto"'+(ST.res==='auto'?' selected':'')+'>자동 ('+sz[0]+'×'+sz[1]+')</option>'
+        +ST_SIZES.map(function(z){const v=z[0]+'x'+z[1];return '<option value="'+v+'"'+(ST.res===v?' selected':'')+'>'+z[0]+'×'+z[1]+'</option>';}).join('')
+      +'</select>'
+      +'<input type="number" min="1" max="28" value="'+ST.steps+'" style="width:52px;" title="스텝" onchange="stOpt(\'steps\',this.value)">'
+      +'<input type="number" min="1" max="10" step="0.5" value="'+ST.scale+'" style="width:52px;" title="가이던스" onchange="stOpt(\'scale\',this.value)">'
+      +'<input type="text" value="'+stEsc(ST.seed)+'" placeholder="시드" style="width:88px;" title="시드 (비우면 무작위)" onchange="stOpt(\'seed\',this.value)">'
+      +'<button class="sd-btn pri" id="sd-go" onclick="stGen()"'+(ST.busy?' disabled':'')+'>'+(ST.mode==='infill'?'🖌 인페인트 생성':'✦ 생성')+'</button>'
+      +'<button class="sd-btn" onclick="stGen(true)" title="같은 시드로 다시"'+(ST.busy||!ST.outSeed?' disabled':'')+'>↻ 같은 시드</button>'
+      +'<span style="flex:1;"></span>'
+      +'<div class="sd-seg" style="width:132px;">'
+        +'<button class="'+(ST.view==='base'?'on':'')+'" onclick="stView(\'base\')"'+(ST.baseImg?'':' disabled')+'>원료</button>'
+        +'<button class="'+(ST.view==='out'?'on':'')+'" onclick="stView(\'out\')"'+(ST.outImg?'':' disabled')+'>결과</button>'
+      +'</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:7px;margin-top:6px;">'
+      +'<span id="sd-status" style="flex:1;font-size:10px;color:#8a8778;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+stEsc(_lastStatus)+'</span>'
+      +'<button class="sd-btn" onclick="stSave()"'+(ST.outUrl?'':' disabled')+'>💾 저장</button>'
+      +'<button class="sd-btn" onclick="stToLib()"'+(ST.outUrl?'':' disabled')+'>📚 라이브러리</button>'
+      +'<button class="sd-btn" onclick="stBaseFrom(\'out\')"'+(ST.outUrl?'':' disabled')+'>↺ 결과를 원료로</button>'
+    +'</div>';
+  if(outs.length){
+    h+='<div class="sd-strip">'+outs.map(function(o,i){
+      return '<img src="'+o.url+'" class="'+(ST.outUrl===o.url?'on':'')+'" onclick="stStripPick('+i+')" title="'+stEsc(o.name||'')+' · 시드 '+(o.seed||0)+'">';
+    }).join('')+'</div>';
+  }
+  el.innerHTML=h;
+}
+let _lastStatus='준비됨';
+stStatus=function(t){_lastStatus=t;const e=$s('sd-status');if(e)e.textContent=t;};
+
+// ── 생성 ───────────────────────────────────────────────────────────
+window.stGen=async function(reuseSeed){
+  if(ST.busy)return;
+  const key=(typeof naiGetKey==='function')?naiGetKey():'';
+  if(!key){stStatus('⚙ API 키 미등록 — 설정에서 NovelAI 키(pst-…)를 등록하십시오');
+    if(window.showNaiSettings)showNaiSettings();return;}
+  const pr=stPrompt();
+  if(!pr){stStatus('프롬프트가 비어 있습니다');return;}
+  const sz=stPickSize();
+  const body={prompt:pr,negative:ST_NEG,name:(ST.npc&&ST.npc.name)||'studio',
+    width:sz[0],height:sz[1],steps:ST.steps,scale:ST.scale,model:ST.model};
+  if(reuseSeed===true&&ST.outSeed)body.seed=ST.outSeed;
+  else if(ST.seed)body.seed=parseInt(ST.seed)||0;
+  if(ST.mode==='infill'){
+    if(!ST.baseImg){stStatus('원료 이미지가 없습니다');return;}
+    if(!stMaskHas()){stStatus('마스크가 비어 있습니다 — 고칠 영역을 붉게 칠하십시오');return;}
+    body.infill={image:stImgB64(sz[0],sz[1]),mask:stMaskB64(sz[0],sz[1]),
+      addOriginal:ST.addOrig,strength:ST.strength,noise:ST.noise};
+  }else if(ST.useRef&&ST.npc&&ST.npc.ref){
+    const r=String(ST.npc.ref),ci=r.indexOf(',');
+    body.ref={img:ci>=0?r.slice(ci+1):r,str:ST.refStr,fid:ST.refFid,style:ST.refStyle,name:ST.npc.name};
+  }
+  // 갤러리 메타는 경량화 — 원본 픽셀(수 MB)은 절대 남기지 않는다
+  const meta=Object.assign({},body);
+  if(body.ref)meta.ref={name:body.ref.name,str:body.ref.str,fid:body.ref.fid,style:body.ref.style};
+  if(body.infill)meta.infill={addOriginal:body.infill.addOriginal,strength:body.infill.strength,noise:body.infill.noise,masked:true};
+
+  ST.busy=true;stBottom();
+  stStatus((ST.mode==='infill'?'인페인트 ':'')+'생성 중… (보통 5~30초)');
+  const t0=Date.now();
+  const tick=setInterval(function(){stStatus((ST.mode==='infill'?'인페인트 ':'')+'생성 중… '+Math.floor((Date.now()-t0)/1000)+'초');},1000);
+  try{
+    const out=await naiDirectGenerate(body,key);
+    const url=URL.createObjectURL(out.blob);
+    ST.outBlob=out.blob;ST.outUrl=url;ST.outSeed=out.seed;
+    ST.outImg=await libLoadImg(url);
+    ST.view='out';
+    if(window.naiGalleryAdd)naiGalleryAdd({blob:out.blob,url:url},body.name,out.seed,null,meta);
+    stStatus('✓ 완료 · 시드 '+out.seed+' — 💾 저장 또는 📚 라이브러리로 보관하십시오');
+  }catch(e){
+    const m=(e&&e.message)||String(e);
+    if(e&&(e.name==='TypeError'||m.indexOf('Failed to fetch')>=0||m.indexOf('Load failed')>=0))
+      stStatus('✖ 브라우저 직통 호출이 차단됨(CORS) — ⚙ 설정의 프록시 URL을 지정하십시오');
+    else stStatus('✖ '+m);
+  }finally{
+    clearInterval(tick);ST.busy=false;stBottom();stNeedDraw();
+  }
+};
+
+window.stSave=function(){
+  if(!ST.outUrl)return;
+  const nm=((ST.npc&&ST.npc.name)||'studio').replace(/[^\w가-힣ㄱ-ㅎa-zA-Z0-9_-]/g,'_').slice(0,40)||'studio';
+  const a=document.createElement('a');
+  a.href=ST.outUrl;a.download=nm+'_'+(ST.outSeed||0)+'.png';
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);},0);
+  stStatus('💾 내려받았습니다');
+};
+window.stToLib=async function(){
+  if(!ST.outUrl){stStatus('저장할 결과가 없습니다');return;}
+  const nm=prompt('라이브러리에 보관할 이름',(ST.npc&&ST.npc.name)||'studio');
+  if(nm===null)return;
+  if(typeof window.libSaveImage!=='function'){stStatus('라이브러리를 찾지 못했습니다');return;}
+  stStatus('라이브러리에 보관 중…');
+  const e=await libSaveImage({url:ST.outUrl,blob:ST.outBlob,seed:ST.outSeed,
+    name:nm,meta:{prompt:stPrompt(),model:ST.model}},nm);
+  if(e){await stReload();stStatus('📚 보관 완료 — '+e.name);}
+};
+
+// ── 열기/닫기 ──────────────────────────────────────────────────────
+async function stReload(){
+  try{
+    const all=await libAll('chars');
+    all.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    // 목록에는 썸네일만 — 참조 원본(수 MB)은 고를 때 한 건씩만 읽는다
+    ST.chars=all.map(function(c){return{id:c.id,name:c.name,thumb:c.thumb,memo:c.memo||'',race:c.race||'',gender:c.gender||''};});
+  }catch(e){ST.chars=[];}
+  stLeft();
+}
+window.stReload=stReload;
+
+window.stOpen=async function(){
+  if(ST.open)return;
+  ST.open=true;
+  root.classList.add('on');
+  document.body.style.overflow='hidden';
+  if(location.hash!=='#studio'){try{location.hash='#studio';}catch(e){}}
+  if(!ST.ready){await stLoadGroups();ST.ready=true;}
+  stRight();stBottom();
+  await stReload();
+  stNeedDraw();
+};
+window.stClose=function(){
+  if(!ST.open)return;
+  ST.open=false;
+  root.classList.remove('on');
+  document.body.style.overflow='';
+  if(location.hash==='#studio'){try{location.hash='';}catch(e){}}
+};
+window.addEventListener('hashchange',function(){
+  if(location.hash==='#studio'){if(!ST.open)stOpen();}
+  else if(ST.open)stClose();
+});
+document.addEventListener('keydown',function(e){
+  if(!ST.open)return;
+  if(e.key==='Escape'){
+    const pe=document.getElementById('paint-editor');
+    if(pe&&pe.classList.contains('on'))return;
+    stClose();
+  }else if((e.ctrlKey||e.metaKey)&&e.key==='z'&&ST.mode==='infill'){
+    e.preventDefault();stMaskUndo();
+  }
+});
+
+// 테스트·외부용 상태 스냅샷 (직렬화 가능한 것만)
+window.stState=function(){
+  return{open:ST.open,mode:ST.mode,view:ST.view,chars:ST.chars.length,
+    npc:ST.npc?{id:ST.npc.id,name:ST.npc.name,hasRef:!!ST.npc.ref}:null,
+    useRef:ST.useRef,refStr:ST.refStr,refFid:ST.refFid,refStyle:ST.refStyle,
+    hasBase:!!ST.baseImg,baseW:ST.baseImg?(ST.baseImg.naturalWidth||ST.baseImg.width):0,
+    baseH:ST.baseImg?(ST.baseImg.naturalHeight||ST.baseImg.height):0,
+    brush:ST.brush,erase:ST.erase,addOrig:ST.addOrig,strength:ST.strength,noise:ST.noise,
+    undo:ST.undo.length,maskHas:stMaskHas(),
+    groups:ST.groups.map(function(g){return{id:g.id,title:g.title,open:g.open,items:g.items.length,
+      sel:(ST.sel[g.id]||[]).length};}),
+    free:ST.free,prompt:stPrompt(),size:stPickSize(),
+    model:ST.model,res:ST.res,steps:ST.steps,scale:ST.scale,seed:ST.seed,
+    outSeed:ST.outSeed,hasOut:!!ST.outImg,busy:ST.busy,status:_lastStatus};
+};
+
+// 상단 버튼 노출 + 초기 라우팅
+const navb=document.getElementById('nav-studio');
+if(navb)navb.style.display='';
+if(location.hash==='#studio')setTimeout(function(){stOpen();},0);
 })();
 
 </script>
