@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v15.1 + NAI</title>
+<title>가호록 v16.0 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -144,6 +144,22 @@ body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',sans-serif
 .prm-info-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--bdr2);background:var(--bg2);color:var(--dim);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;}
 .prm-info-btn:hover{border-color:var(--gold);color:var(--gold);background:var(--gdim);}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .25s ease;}
+.lib-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;overflow:hidden;position:relative;cursor:pointer;transition:border-color .12s;}
+.lib-card:hover{border-color:var(--gold);}
+.lib-card.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;}
+.lib-card img{width:100%;display:block;aspect-ratio:2/3;object-fit:cover;background:#000;}
+.lib-card .lc-n{font-size:9px;font-weight:700;color:var(--txt);padding:4px 5px 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lib-card .lc-s{font-size:8px;color:var(--dim);padding:0 5px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px;margin-top:8px;}
+.lib-btn{padding:3px 8px;border-radius:9px;border:1px solid var(--bdr2);background:transparent;color:var(--gold);font-size:9px;cursor:pointer;white-space:nowrap;}
+.lib-btn:hover{background:var(--bdr);}
+.lib-btn.pri{background:var(--gold);color:var(--bg);border-color:var(--gold);font-weight:700;}
+.lib-btn.dgr{color:#c46;border-color:#c46;}
+.lib-sel{width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:10px;padding:3px 4px;}
+.lib-lb{font-size:8px;color:var(--dim);display:block;margin-bottom:2px;}
+.lib-ref{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--gold);border-radius:8px;padding:6px;}
+.lib-ref img{width:38px;height:56px;object-fit:cover;border-radius:4px;background:#000;}
+.lib-rng{width:100%;accent-color:var(--gold);}
 .modal-box{background:var(--card);border:1px solid var(--bdr2);border-radius:14px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;padding:18px 14px;position:relative;}
 .modal-close{position:absolute;top:10px;right:12px;font-size:18px;color:var(--dim);cursor:pointer;background:none;border:none;line-height:1;}
 .modal-close:hover{color:var(--txt);}
@@ -358,6 +374,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
       <button onclick="navigator.clipboard.writeText(document.getElementById('nai-prompt').textContent).then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='복사',1200)})" style="position:absolute;top:8px;right:8px;padding:3px 10px;font-size:10px;background:var(--gold);color:var(--bg);border:none;border-radius:4px;cursor:pointer;font-weight:bold;">복사</button>
     </div>
     <div id="nai-slot-sec" style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;"></div>
+    <div id="lib-sec" style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;"></div>
     <div style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;">
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">NAI 이미지 생성 (로컬 서버 경유)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
@@ -411,6 +428,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
 </div>
 <div id="design-modal"></div>
 <div id="agecfg-modal"></div>
+<div id="lib-modal"></div>
 <script>
 const GEN={wood:'fire',fire:'earth',earth:'metal',metal:'water',water:'wood'};
 const OVR={wood:'earth',fire:'metal',earth:'water',metal:'wood',water:'fire'};
@@ -3635,16 +3653,24 @@ function slotVal(addr,key,def){
   const v=a[key];
   return(v!==undefined&&v!=='')?v:def;
 }
-function assembleNai(d){
+// noDelegate=true 면 참고 베이스를 무시하고 외형 태그를 모두 넣는다 (토큰 비교용)
+function assembleNai(d,noDelegate){
   const {addr}=slotAddr(d);
   const gdr=d.gender||'m';
   const tags=[gdr==='f'?'1girl':'1boy'];
   const style=naiCommon('style');if(style)tags.push(style);
-  naiParts(d).forEach(p=>{if(!naiPartOn(p.key))return;const v=slotVal(addr,p.key,p.def);if(v)tags.push(v);});
-  const ot=naiOutfitTags(gdr);if(ot)tags.push(ot);   // 복장 상태 (나체/속옷/평상복)
-  const sinA=_calcSinsalAppear(d);
-  if(sinA['빛나는 외모'])tags.push('beautiful, attractive');
-  if(sinA['치명적 매력'])tags.push('seductive, alluring');
+  // 참고 베이스에 정체성을 위임하면 외형 태그를 통째로 뺀다 → 프롬프트 토큰 절약
+  const delegate=(typeof libDelegating==='function')&&libDelegating()&&!noDelegate;
+  if(!delegate){
+    naiParts(d).forEach(p=>{if(!naiPartOn(p.key))return;const v=slotVal(addr,p.key,p.def);if(v)tags.push(v);});
+  }
+  const ot=naiOutfitTags(gdr);if(ot)tags.push(ot);   // 복장은 항상 유지 (베이스와 무관하게 갈아입힌다)
+  if(!delegate){
+    const sinA=_calcSinsalAppear(d);
+    if(sinA['빛나는 외모'])tags.push('beautiful, attractive');
+    if(sinA['치명적 매력'])tags.push('seductive, alluring');
+  }
+  if(typeof libSceneTags==='function')libSceneTags().forEach(function(t){tags.push(t);});   // 구도·자세·표정·배경·조명
   return tags.filter(Boolean).join(', ');
 }
 function esc(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
@@ -3695,6 +3721,7 @@ function slotRow(label,val,key,def){
 }
 function toggleSlotSec(){slotSecOpen=!slotSecOpen;if(currentData)renderSlotEditor(currentData);}
 function renderSlotEditor(d){
+  if(typeof libRenderSec==='function')libRenderSec();   // 라이브러리·장면 섹션 동기화
   const sec=document.getElementById('nai-slot-sec');if(!sec)return;
   let h='<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleSlotSec()">'
     +'<span style="font-size:10px;color:var(--gold);font-weight:700;">✎ 공통 프롬프트 슬롯</span>'
@@ -3757,8 +3784,14 @@ async function naiGenerate(reuseSeed){
     scale:parseFloat(document.getElementById('nai-scale').value)||5,
     model:document.getElementById('nai-model').value
   };
+  // 참고 베이스 (libCurRef 는 라이브러리 블록이 window 에 얹어 준 접근자)
+  const _lr=(typeof libCurRef==='function')?libCurRef():null;
+  if(_lr)body.ref=_lr;
   if(reuseSeed&&naiLastSeed)body.seed=naiLastSeed;
   else if(seedIn)body.seed=parseInt(seedIn);
+  // 갤러리·프롬프트 기록용 경량 메타 — 참조 이미지 원본(수 MB base64)은 떼어낸다
+  const metaLite=Object.assign({},body);
+  if(body.ref)metaLite.ref={name:body.ref.name,str:body.ref.str,fid:body.ref.fid,style:body.ref.style};
   if(!NAI_SERVER_MODE&&!naiGetKey()){
     st.textContent='⚙ API 키 미등록 — 설정 창에서 NovelAI 키(pst-...)를 입력할 것';
     if(window.showNaiSettings)showNaiSettings();
@@ -3774,7 +3807,7 @@ async function naiGenerate(reuseSeed){
       if(!r.ok||j.error){st.textContent='✖ '+(j.error||('HTTP '+r.status));}
       else{
         naiLastSeed=j.seed||0;
-        if(window.naiGalleryAdd)naiGalleryAdd(j.image,body.name,j.seed,j.saved,body);
+        if(window.naiGalleryAdd)naiGalleryAdd(j.image,body.name,j.seed,j.saved,metaLite);
         naiShowResult(j.image,'저장됨: '+j.saved+'  ·  시드 '+j.seed);
         st.textContent='✓ 완료';
         re.disabled=false;
@@ -3783,7 +3816,7 @@ async function naiGenerate(reuseSeed){
       const out=await naiDirectGenerate(body,naiGetKey());
       naiLastSeed=out.seed;
       const url=URL.createObjectURL(out.blob);
-      naiGalleryAdd({blob:out.blob,url:url},body.name,out.seed,null,body);
+      naiGalleryAdd({blob:out.blob,url:url},body.name,out.seed,null,metaLite);
       naiShowResult(url,'세션 갤러리 보관 (미저장)  ·  시드 '+out.seed);
       st.textContent='✓ 완료 — 파일로 남기려면 갤러리의 💾 저장';
       re.disabled=false;
@@ -4392,6 +4425,439 @@ async function naiUnzip(buf){
 }
 
 // ── NAI 직통 호출 (nai_server.py 페이로드 미러) ──
+// ═══════════════════════════════════════════════════════════════════
+//  캐릭터 라이브러리 (v16.0)
+//    · 마음에 든 생성 결과를 IndexedDB에 영구 보관한다
+//    · 보관된 캐릭터를 NAI Precise Reference(캐릭터 참조)의 베이스로 올려
+//      복장·구도·자세만 글로 지정해 같은 인물의 다른 장면을 뽑는다
+//    · 정체성을 이미지가 담당하므로 외형 태그를 통째로 뺄 수 있다 → 토큰 절약
+//  ※ 원료 절대 파괴 금지 — 저장된 원국·프롬프트·원본 이미지는 그대로 보존한다
+// ═══════════════════════════════════════════════════════════════════
+const LIB_DB='gahorok_lib',LIB_VER=1;
+const CR_SIZES=[[1024,1536],[1536,1024],[1472,1472]];   // NAI 캐릭터 참조 허용 캔버스
+let _libDB=null;
+function libOpen(){
+  if(_libDB)return Promise.resolve(_libDB);
+  return new Promise(function(res,rej){
+    if(!window.indexedDB){rej(new Error('이 브라우저는 IndexedDB를 지원하지 않습니다'));return;}
+    const rq=indexedDB.open(LIB_DB,LIB_VER);
+    rq.onupgradeneeded=function(e){
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('chars'))db.createObjectStore('chars',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('scenes'))db.createObjectStore('scenes',{keyPath:'id'});
+    };
+    rq.onsuccess=function(){_libDB=rq.result;res(_libDB);};
+    rq.onerror=function(){rej(rq.error||new Error('IndexedDB 열기 실패'));};
+  });
+}
+function _libOS(store,mode){return libOpen().then(function(db){return db.transaction(store,mode).objectStore(store);});}
+function _libReq(r){return new Promise(function(res,rej){r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+function libPut(store,obj){return _libOS(store,'readwrite').then(function(os){return _libReq(os.put(obj)).then(function(){return obj;});});}
+function libAll(store){return _libOS(store,'readonly').then(function(os){return _libReq(os.getAll()).then(function(a){return a||[];});});}
+function libGet(store,id){return _libOS(store,'readonly').then(function(os){return _libReq(os.get(id));});}
+function libDel(store,id){return _libOS(store,'readwrite').then(function(os){return _libReq(os.delete(id));});}
+function libId(){return 'c'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);}
+
+// ── 이미지 유틸 (참조 캔버스 레터박스 + 썸네일) ──
+function libPickCanvas(w,h){
+  const a=w/h;let best=CR_SIZES[0],bd=Infinity;
+  CR_SIZES.forEach(function(c){const d=Math.abs(c[0]/c[1]-a);if(d<bd){bd=d;best=c;}});
+  return best;
+}
+function libLoadImg(src){
+  return new Promise(function(res,rej){
+    const im=new Image();
+    im.onload=function(){res(im);};
+    im.onerror=function(){rej(new Error('이미지를 읽지 못했습니다'));};
+    im.src=src;
+  });
+}
+// 참조용 캔버스에 비율 유지 레터박스 → dataURL(png)
+function libPadToCanvas(src){
+  return libLoadImg(src).then(function(im){
+    const iw=im.naturalWidth||im.width,ih=im.naturalHeight||im.height;
+    const c=libPickCanvas(iw,ih),cw=c[0],ch=c[1];
+    const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
+    const g=cv.getContext('2d');
+    g.fillStyle='#000';g.fillRect(0,0,cw,ch);
+    const sc=Math.min(cw/iw,ch/ih);
+    const dw=Math.max(1,Math.round(iw*sc)),dh=Math.max(1,Math.round(ih*sc));
+    g.drawImage(im,Math.floor((cw-dw)/2),Math.floor((ch-dh)/2),dw,dh);
+    return{dataUrl:cv.toDataURL('image/png'),w:cw,h:ch};
+  });
+}
+function libThumb(src,max){
+  const M=max||240;
+  return libLoadImg(src).then(function(im){
+    const iw=im.naturalWidth||im.width,ih=im.naturalHeight||im.height;
+    const sc=Math.min(M/iw,M/ih,1);
+    const cv=document.createElement('canvas');
+    cv.width=Math.max(1,Math.round(iw*sc));cv.height=Math.max(1,Math.round(ih*sc));
+    cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    return cv.toDataURL('image/jpeg',0.72);
+  });
+}
+
+// ── 참고 베이스 상태 ──
+let libRef=null;              // {id,name,thumb,ref(dataURL),w,h}
+let libRefMode='full';        // full = 정체성 위임 · mix = 외형 태그도 함께
+let libRefStr=1.0;            // director_reference_strength_values
+let libRefFid=1.0;            // → secondary = 1 - fidelity
+let libRefStyle=false;        // true 면 화풍까지 복사 (character&style)
+let libSecOpen=true;
+
+// ── 장면 (구도·자세·표정·배경·조명) ──
+let libScene={shot:'',pose:'',expr:'',bg:'',light:'',extra:''};
+const LIB_SHOT=[['','(지정 안 함)'],['portrait','인물 클로즈업 (얼굴)'],['upper body','상반신'],['cowboy shot','허벅지 위 (카우보이)'],['full body','전신'],
+  ['from above','하이앵글 (위에서)'],['from below','로우앵글 (아래에서)'],['from side','측면'],['from behind','뒤에서'],['dutch angle','기울인 앵글'],['close-up','극단적 클로즈업'],['wide shot','원경']];
+const LIB_POSE=[['','(지정 안 함)'],['standing','서 있음'],['sitting','앉음'],['kneeling','무릎 꿇음'],['lying','누움'],['on back','등 대고 누움'],['on stomach','엎드림'],
+  ['walking','걷는 중'],['running','달리는 중'],['jumping','도약'],['crossed arms','팔짱'],['hands on hips','허리에 손'],['arms up','팔 들어올림'],
+  ['leaning forward','앞으로 숙임'],['looking back','뒤돌아봄'],['squatting','쪼그려 앉음'],['bent over','상체 굽힘'],['holding weapon','무기를 든 자세'],['fighting stance','전투 자세']];
+const LIB_EXPR=[['','(지정 안 함)'],['looking at viewer','정면 응시'],['looking away','시선 회피'],['smile','미소'],['grin','씩 웃음'],['serious','무표정·진지'],
+  ['angry','분노'],['sad','슬픔'],['crying','눈물'],['blush','홍조'],['embarrassed','당황'],['seductive smile','요염한 미소'],['smug','거만'],
+  ['open mouth','입 벌림'],['closed eyes','눈 감음'],['half-closed eyes','게슴츠레'],['glaring','노려봄']];
+const LIB_BG=[['','(지정 안 함)'],['simple background','단색 배경'],['white background','흰 배경'],['dark background','어두운 배경'],
+  ['forest','숲'],['ruins','폐허'],['castle','성'],['throne room','왕좌의 방'],['dungeon','던전'],['tavern','주점'],['battlefield','전장'],
+  ['village','마을'],['snow','설원'],['cave','동굴'],['church','성당'],['bedroom','침실'],['indoors','실내'],['outdoors','야외'],['night','밤']];
+const LIB_LIGHT=[['','(지정 안 함)'],['cinematic lighting','시네마틱'],['dramatic shadow','강한 명암'],['backlighting','역광'],['rim light','림 라이트'],
+  ['candlelight','촛불'],['moonlight','달빛'],['firelight','불빛'],['sunlight','햇빛'],['dim lighting','어스름'],['god rays','빛내림']];
+function libSceneTags(){
+  return [libScene.shot,libScene.pose,libScene.expr,libScene.bg,libScene.light,libScene.extra]
+    .map(function(t){return String(t||'').trim();}).filter(Boolean);
+}
+function libSceneClear(){libScene={shot:'',pose:'',expr:'',bg:'',light:'',extra:''};libRenderSec();refreshNaiPromptView();}
+function libSceneSet(k,v){if(!(k in libScene))return;libScene[k]=v;libRenderSec();refreshNaiPromptView();}
+function libDelegating(){return !!(libRef&&libRefMode==='full');}
+
+// ── 라이브러리 저장 ──
+// 보관 코어 — 갤러리·편집 결과·외부 이미지 모두 이 경로를 탄다
+async function libStore(o,nm){
+  if(!o||!o.url)throw new Error('저장할 이미지가 없습니다');
+  libToast('참조 이미지 준비 중...');
+  const pad=await libPadToCanvas(o.url);
+  const th=await libThumb(o.url,240);
+  const d=currentData||{};
+  const ent={
+    id:libId(),name:String(nm||o.name||'char').trim()||'char',
+    ts:Date.now(),
+    race:d.race||'',gender:d.gender||'',
+    idPrompt:(o.meta&&o.meta.prompt)||'',
+    seed:o.seed||0,model:(o.meta&&o.meta.model)||'',
+    ref:pad.dataUrl,w:pad.w,h:pad.h,
+    thumb:th,
+    base:libSnapshot(d),
+    memo:'',tags:[]
+  };
+  await libPut('chars',ent);
+  libToast('📚 라이브러리 저장 완료 — '+ent.name);
+  libRenderSec();
+  return ent;
+}
+window.libSaveImage=async function(o,nm){
+  try{return await libStore(o,nm);}
+  catch(e){libToast('저장 실패: '+(e&&e.message||e));return null;}
+};
+window.libSaveFromGallery=async function(i){
+  const o=naiOutputs[i];
+  if(!o){libToast('저장할 이미지가 없습니다');return;}
+  const nm=prompt('라이브러리에 저장할 이름',(o.name||'char'));
+  if(nm===null)return;
+  try{await libStore(o,nm);}
+  catch(e){libToast('저장 실패: '+(e&&e.message||e));}
+};
+// 원국 스냅샷 — 나중에 인물 정보를 되살리기 위한 최소 보존분
+function libSnapshot(d){
+  if(!d)return null;
+  try{
+    return{name:d.name||'',race:d.race||'',gender:d.gender||'',
+      birth:d.birth||null,age:d.age||null,ageBandPin:d.ageBandPin||'',
+      p:d.p?JSON.parse(JSON.stringify(d.p)):null,
+      el:d.el?JSON.parse(JSON.stringify(d.el)):null};
+  }catch(e){return null;}
+}
+function libToast(msg){
+  const st=document.getElementById('nai-status');
+  if(st)st.textContent=msg;
+}
+
+// ── 참고 베이스 올리기/내리기 ──
+window.libUseAsRef=async function(id){
+  try{
+    const e=await libGet('chars',id);
+    if(!e){libToast('항목을 찾을 수 없습니다');return;}
+    libRef={id:e.id,name:e.name,thumb:e.thumb,ref:e.ref,w:e.w,h:e.h};
+    closeLibModal();
+    libRenderSec();refreshNaiPromptView();
+    libToast('참고 베이스: '+e.name+' — 복장·구도·자세만 지정하면 됩니다');
+  }catch(err){libToast('불러오기 실패: '+(err&&err.message||err));}
+};
+window.libClearRef=function(){libRef=null;libRenderSec();refreshNaiPromptView();};
+window.libRefModeSet=function(v){libRefMode=(v==='mix')?'mix':'full';libRenderSec();refreshNaiPromptView();};
+window.libRefStrSet=function(v){libRefStr=Math.max(0,Math.min(1,parseFloat(v)||0));libRenderSec();};
+window.libRefFidSet=function(v){libRefFid=Math.max(0,Math.min(1,parseFloat(v)||0));libRenderSec();};
+window.libRefStyleSet=function(b){libRefStyle=!!b;libRenderSec();};
+window.libToggleSec=function(){libSecOpen=!libSecOpen;libRenderSec();};
+
+// ── 장면 프리셋 저장/불러오기 ──
+window.libSceneSave=async function(){
+  const nm=prompt('장면 프리셋 이름');
+  if(nm===null)return;
+  const o={id:libId(),name:(nm||'장면').trim()||'장면',ts:Date.now(),scene:JSON.parse(JSON.stringify(libScene)),
+    refMode:libRefMode,str:libRefStr,fid:libRefFid,style:libRefStyle};
+  try{await libPut('scenes',o);libToast('🎬 장면 저장: '+o.name);libRenderSec();}
+  catch(e){libToast('장면 저장 실패: '+(e&&e.message||e));}
+};
+window.libSceneLoad=async function(id){
+  try{
+    const o=await libGet('scenes',id);if(!o)return;
+    libScene=Object.assign({shot:'',pose:'',expr:'',bg:'',light:'',extra:''},o.scene||{});
+    if(o.refMode)libRefMode=o.refMode;
+    if(typeof o.str==='number')libRefStr=o.str;
+    if(typeof o.fid==='number')libRefFid=o.fid;
+    libRefStyle=!!o.style;
+    closeLibModal();libRenderSec();refreshNaiPromptView();
+    libToast('🎬 장면 적용: '+o.name);
+  }catch(e){libToast('장면 불러오기 실패: '+(e&&e.message||e));}
+};
+window.libSceneDel=async function(id){await libDel('scenes',id);drawLibModal();};
+
+// ── 항목 편집 / 삭제 / 내보내기 ──
+window.libRename=async function(id){
+  const e=await libGet('chars',id);if(!e)return;
+  const nm=prompt('이름 변경',e.name);if(nm===null)return;
+  e.name=(nm||'').trim()||e.name;await libPut('chars',e);
+  if(libRef&&libRef.id===id)libRef.name=e.name;
+  drawLibModal();libRenderSec();
+};
+window.libMemo=async function(id){
+  const e=await libGet('chars',id);if(!e)return;
+  const m=prompt('메모 (설정·특징 등)',e.memo||'');if(m===null)return;
+  e.memo=m;await libPut('chars',e);drawLibModal();
+};
+window.libRemove=async function(id){
+  const e=await libGet('chars',id);if(!e)return;
+  if(!confirm('“'+e.name+'” 을(를) 라이브러리에서 삭제합니다. 되돌릴 수 없습니다.'))return;
+  await libDel('chars',id);
+  if(libRef&&libRef.id===id)libRef=null;
+  drawLibModal();libRenderSec();refreshNaiPromptView();
+};
+function libDownload(name,text){
+  const b=new Blob([text],{type:'application/json'});
+  const u=URL.createObjectURL(b);
+  const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){a.remove();URL.revokeObjectURL(u);},400);
+}
+window.libExportOne=async function(id){
+  const e=await libGet('chars',id);if(!e)return;
+  libDownload('gahorok_char_'+safeName(e.name)+'.json',JSON.stringify({fmt:'gahorok-lib',v:1,chars:[e]}));
+};
+window.libExportAll=async function(){
+  const a=await libAll('chars'),sc=await libAll('scenes');
+  if(!a.length&&!sc.length){libToast('내보낼 항목이 없습니다');return;}
+  libDownload('gahorok_library_'+stamp(Date.now())+'.json',JSON.stringify({fmt:'gahorok-lib',v:1,chars:a,scenes:sc}));
+};
+window.libImport=function(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='application/json,.json';
+  inp.onchange=function(){
+    const f=inp.files&&inp.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=async function(){
+      try{
+        const j=JSON.parse(rd.result);
+        if(!j||j.fmt!=='gahorok-lib')throw new Error('가호록 라이브러리 파일이 아닙니다');
+        let n=0;
+        // 기존 항목은 덮어쓰지 않는다 — 같은 id면 새 id를 부여해 둘 다 남긴다
+        const cur=await libAll('chars'),have={};cur.forEach(function(c){have[c.id]=1;});
+        for(const c of (j.chars||[])){
+          const o=Object.assign({},c);
+          if(have[o.id])o.id=libId();
+          if(!o.id)o.id=libId();
+          await libPut('chars',o);n++;
+        }
+        for(const t of (j.scenes||[])){
+          const o=Object.assign({},t);if(!o.id)o.id=libId();
+          await libPut('scenes',o);
+        }
+        libToast('가져오기 완료 — 캐릭터 '+n+'건');
+        drawLibModal();libRenderSec();
+      }catch(e){libToast('가져오기 실패: '+(e&&e.message||e));}
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+};
+
+// ── 라이브러리 모달 ──
+let libTab='chars',libQuery='';
+window.openLibModal=function(tab){libTab=(tab==='scenes')?'scenes':'chars';drawLibModal();};
+window.closeLibModal=function(){const el=document.getElementById('lib-modal');if(el)el.innerHTML='';};
+window.libTabSet=function(t){libTab=t;drawLibModal();};
+window.libSearch=function(v){libQuery=String(v||'').toLowerCase();drawLibModal(true);};
+async function drawLibModal(keepFocus){
+  const el=document.getElementById('lib-modal');if(!el)return;
+  const chars=await libAll('chars'),scenes=await libAll('scenes');
+  chars.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  scenes.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  const q=libQuery;
+  const fc=q?chars.filter(function(c){return (c.name||'').toLowerCase().indexOf(q)>=0||(c.memo||'').toLowerCase().indexOf(q)>=0;}):chars;
+  let h='<div class="modal-overlay" onclick="if(event.target===this)closeLibModal()"><div class="modal-box" style="max-width:520px;">'
+    +'<div class="modal-t">📚 캐릭터 라이브러리</div>'
+    +'<div class="modal-sub">마음에 든 인물을 보관하고, 참고 베이스로 올려 다른 복장·구도로 다시 그린다</div>'
+    +'<div style="display:flex;gap:5px;margin:8px 0;flex-wrap:wrap;align-items:center;">'
+    +'<button class="lib-btn'+(libTab==='chars'?' pri':'')+'" onclick="libTabSet(\'chars\')">인물 '+chars.length+'</button>'
+    +'<button class="lib-btn'+(libTab==='scenes'?' pri':'')+'" onclick="libTabSet(\'scenes\')">장면 '+scenes.length+'</button>'
+    +'<span style="flex:1;"></span>'
+    +'<button class="lib-btn" onclick="libImport()">⇧ 가져오기</button>'
+    +'<button class="lib-btn" onclick="libExportAll()">⇩ 전체 내보내기</button></div>';
+  if(libTab==='chars'){
+    h+='<input id="lib-q" type="text" placeholder="이름·메모 검색" value="'+esc(libQuery)+'" oninput="libSearch(this.value)" '
+      +'style="width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;font-size:10px;padding:5px 7px;">';
+    if(!fc.length){
+      h+='<div style="font-size:10px;color:var(--dim);text-align:center;padding:22px 6px;line-height:1.7;">'
+        +(chars.length?'검색 결과가 없습니다.':'아직 보관된 인물이 없습니다.<br>이미지를 생성한 뒤 갤러리에서 <b style="color:var(--gold);">📚 라이브러리</b> 를 누르면 여기에 쌓입니다.')+'</div>';
+    }else{
+      h+='<div class="lib-grid">';
+      fc.forEach(function(c){
+        const on=libRef&&libRef.id===c.id;
+        h+='<div class="lib-card'+(on?' on':'')+'" onclick="libUseAsRef(\''+c.id+'\')" title="클릭 → 참고 베이스로 사용">'
+          +'<img src="'+(c.thumb||'')+'" alt="">'
+          +'<div class="lc-n">'+esc(c.name)+'</div>'
+          +'<div class="lc-s">'+esc(libRaceKo(c.race))+(c.gender?(c.gender==='f'?' ♀':' ♂'):'')+'</div>'
+          +'<div style="display:flex;gap:2px;padding:0 4px 5px;flex-wrap:wrap;" onclick="event.stopPropagation()">'
+          +'<button class="lib-btn" style="padding:1px 5px;" onclick="libRename(\''+c.id+'\')" title="이름 변경">✎</button>'
+          +'<button class="lib-btn" style="padding:1px 5px;" onclick="libMemo(\''+c.id+'\')" title="메모">🗒</button>'
+          +'<button class="lib-btn" style="padding:1px 5px;" onclick="libExportOne(\''+c.id+'\')" title="내보내기">⇩</button>'
+          +'<button class="lib-btn dgr" style="padding:1px 5px;" onclick="libRemove(\''+c.id+'\')" title="삭제">✕</button></div>'
+          +(c.memo?'<div class="lc-s" style="color:var(--fnt);">'+esc(c.memo)+'</div>':'')
+          +'</div>';
+      });
+      h+='</div>';
+    }
+  }else{
+    if(!scenes.length){
+      h+='<div style="font-size:10px;color:var(--dim);text-align:center;padding:22px 6px;line-height:1.7;">'
+        +'저장된 장면이 없습니다.<br>구도·자세를 잡은 뒤 <b style="color:var(--gold);">🎬 장면 저장</b> 을 누르면 여기에 쌓입니다.</div>';
+    }else{
+      h+='<table class="modal-tbl" style="margin-top:8px;"><tr><th>장면</th><th style="width:150px;">태그</th><th style="width:52px;"></th></tr>';
+      scenes.forEach(function(t){
+        const tg=[t.scene&&t.scene.shot,t.scene&&t.scene.pose,t.scene&&t.scene.expr,t.scene&&t.scene.bg,t.scene&&t.scene.light]
+          .filter(Boolean).join(', ')||'(빈 장면)';
+        h+='<tr><td style="font-size:10px;font-weight:600;">'+esc(t.name)+'</td>'
+          +'<td class="ss-ex" style="font-size:8px;color:var(--dim);">'+esc(tg)+'</td>'
+          +'<td style="white-space:nowrap;"><button class="lib-btn" style="padding:1px 5px;" onclick="libSceneLoad(\''+t.id+'\')">적용</button>'
+          +'<button class="lib-btn dgr" style="padding:1px 5px;" onclick="libSceneDel(\''+t.id+'\')">✕</button></td></tr>';
+      });
+      h+='</table>';
+    }
+  }
+  h+='<div style="font-size:8px;color:var(--fnt);line-height:1.7;margin-top:9px;border-top:1px solid var(--bdr);padding-top:7px;">'
+    +'· 보관 위치는 이 브라우저의 IndexedDB입니다 — 설정 내보내기와 별개이니 백업은 <b>전체 내보내기</b>로 받아 두십시오.<br>'
+    +'· 참고 베이스는 NAI v4.5 의 캐릭터 참조 기능을 사용합니다. 생성 1회당 Anlas 5가 추가로 듭니다.<br>'
+    +'· 가져오기는 기존 항목을 덮어쓰지 않습니다 — 같은 항목이면 사본으로 함께 남습니다.</div>'
+    +'<div style="text-align:right;margin-top:9px;"><button class="lib-btn" onclick="closeLibModal()">닫기</button></div>'
+    +'</div></div>';
+  el.innerHTML=h;
+  if(keepFocus){const q2=document.getElementById('lib-q');if(q2){q2.focus();q2.setSelectionRange(q2.value.length,q2.value.length);}}
+}
+function libRaceKo(r){return (r&&RACES[r]&&RACES[r].name)||r||'';}
+
+// ── 외형 탭 섹션 렌더 ──
+function libSelHtml(id,list,cur,key){
+  let h='<select class="lib-sel" onchange="libSceneSet(\''+key+'\',this.value)">';
+  list.forEach(function(o){h+='<option value="'+esc(o[0])+'"'+(cur===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';});
+  return h+'</select>';
+}
+function libRenderSec(){
+  const sec=document.getElementById('lib-sec');if(!sec)return;
+  let h='<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="libToggleSec()">'
+    +'<span style="font-size:10px;color:var(--gold);font-weight:700;">📚 캐릭터 라이브러리 · 장면</span>'
+    +'<span style="font-size:9px;color:var(--dim);">'+(libRef?('베이스: '+esc(libRef.name)):'베이스 없음')+' '+(libSecOpen?'▲':'▼')+'</span></div>';
+  if(libSecOpen){
+    h+='<div style="display:flex;gap:5px;margin:7px 0;flex-wrap:wrap;">'
+      +'<button class="lib-btn pri" onclick="openLibModal(\'chars\')">📚 라이브러리 열기</button>'
+      +'<button class="lib-btn" onclick="libSaveCurrent()">💾 현재 이미지 보관</button></div>';
+    if(libRef){
+      h+='<div class="lib-ref"><img src="'+(libRef.thumb||'')+'" alt="">'
+        +'<div style="flex:1;min-width:0;"><div style="font-size:10px;font-weight:700;color:var(--gold);">'+esc(libRef.name)+'</div>'
+        +'<div style="font-size:8px;color:var(--dim);">참고 베이스 · '+libRef.w+'×'+libRef.h+' 캔버스</div></div>'
+        +'<button class="lib-btn dgr" onclick="libClearRef()">해제</button></div>';
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px;">'
+        +'<div><span class="lib-lb">정체성 처리</span>'
+        +'<select class="lib-sel" onchange="libRefModeSet(this.value)">'
+        +'<option value="full"'+(libRefMode==='full'?' selected':'')+'>전체 위임 (외형 태그 제거)</option>'
+        +'<option value="mix"'+(libRefMode==='mix'?' selected':'')+'>보강 (외형 태그도 유지)</option></select></div>'
+        +'<div><span class="lib-lb">화풍</span>'
+        +'<label style="font-size:9px;color:var(--txt);display:flex;align-items:center;gap:4px;padding-top:3px;">'
+        +'<input type="checkbox"'+(libRefStyle?' checked':'')+' onchange="libRefStyleSet(this.checked)" style="accent-color:var(--gold);">화풍까지 복사</label></div>'
+        +'<div><span class="lib-lb">강도 '+libRefStr.toFixed(2)+'</span>'
+        +'<input class="lib-rng" type="range" min="0" max="1" step="0.05" value="'+libRefStr+'" oninput="libRefStrSet(this.value)"></div>'
+        +'<div><span class="lib-lb">정밀도 '+libRefFid.toFixed(2)+'</span>'
+        +'<input class="lib-rng" type="range" min="0" max="1" step="0.05" value="'+libRefFid+'" oninput="libRefFidSet(this.value)"></div>'
+        +'</div>';
+    }
+    h+='<div style="margin-top:9px;border-top:1px solid var(--bdr);padding-top:7px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">'
+      +'<span style="font-size:9px;color:var(--gold);font-weight:700;">🎬 장면 — 구도 · 자세</span>'
+      +'<span><button class="lib-btn" onclick="libSceneSave()">장면 저장</button>'
+      +'<button class="lib-btn" onclick="openLibModal(\'scenes\')">목록</button>'
+      +'<button class="lib-btn" onclick="libSceneClear()">비움</button></span></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+      +'<div><span class="lib-lb">구도 · 앵글</span>'+libSelHtml('shot',LIB_SHOT,libScene.shot,'shot')+'</div>'
+      +'<div><span class="lib-lb">자세</span>'+libSelHtml('pose',LIB_POSE,libScene.pose,'pose')+'</div>'
+      +'<div><span class="lib-lb">표정 · 시선</span>'+libSelHtml('expr',LIB_EXPR,libScene.expr,'expr')+'</div>'
+      +'<div><span class="lib-lb">배경</span>'+libSelHtml('bg',LIB_BG,libScene.bg,'bg')+'</div>'
+      +'<div><span class="lib-lb">조명</span>'+libSelHtml('light',LIB_LIGHT,libScene.light,'light')+'</div>'
+      +'<div><span class="lib-lb">추가 태그 (자유)</span>'
+      +'<input class="lib-sel" type="text" value="'+esc(libScene.extra)+'" placeholder="예: holding sword, torn cape" '
+      +'onchange="libSceneSet(\'extra\',this.value)"></div>'
+      +'</div></div>';
+    h+='<div id="lib-save" style="font-size:8px;color:var(--fnt);margin-top:7px;line-height:1.7;">'+libSaveNote()+'</div>';
+  }
+  sec.innerHTML=h;
+}
+// 토큰 절감 안내 — 위임 시 빠지는 외형 태그의 추정 토큰
+function libSaveNote(){
+  if(!currentData)return '· 인물을 먼저 생성하면 장면 구성이 활성화됩니다.';
+  if(!libRef)return '· 참고 베이스를 올리면 외형 태그를 빼고 복장·구도·자세만으로 같은 인물을 다시 그릴 수 있습니다.';
+  const full=naiTokenEst(assembleNai(currentData,true));
+  const del=naiTokenEst(assembleNai(currentData,false));
+  const d=full-del;
+  if(libRefMode!=='full')return '· 보강 모드 — 외형 태그를 그대로 두고 참조를 얹습니다. 인물이 잘 안 지켜질 때 쓰십시오.';
+  return '· 정체성 위임 중 — 외형 태그 대신 참조 이미지가 인물을 담당합니다. 추정 <b style="color:var(--gold);">'+(d>0?('−'+d):'0')+' 토큰</b> 절약 (현재 ~'+del+').';
+}
+// 현재 화면의 이미지를 바로 보관
+window.libSaveCurrent=function(){
+  if(!naiOutputs.length){libToast('먼저 이미지를 생성하십시오');return;}
+  libSaveFromGallery(naiGalCur>=0?naiGalCur:naiOutputs.length-1);
+};
+
+
+// ── 전역 노출 ──
+// 이 WEB PACK 블록 전체가 IIFE 안이라, 밖(전역)의 assembleNai·renderSlotEditor·naiGenerate 가
+// 라이브러리 심볼을 보려면 window 에 명시적으로 얹어야 한다.
+window.LIB_DB=LIB_DB;window.CR_SIZES=CR_SIZES;
+window.LIB_SHOT=LIB_SHOT;window.LIB_POSE=LIB_POSE;window.LIB_EXPR=LIB_EXPR;window.LIB_BG=LIB_BG;window.LIB_LIGHT=LIB_LIGHT;
+window.libOpen=libOpen;window.libPut=libPut;window.libAll=libAll;window.libGet=libGet;window.libDel=libDel;window.libId=libId;
+window.libPickCanvas=libPickCanvas;window.libLoadImg=libLoadImg;window.libPadToCanvas=libPadToCanvas;window.libThumb=libThumb;
+window.libSceneTags=libSceneTags;window.libSceneSet=libSceneSet;window.libSceneClear=libSceneClear;
+window.libDelegating=libDelegating;window.libSnapshot=libSnapshot;window.libToast=libToast;
+window.libRenderSec=libRenderSec;window.libSaveNote=libSaveNote;window.libRaceKo=libRaceKo;window.drawLibModal=drawLibModal;
+// 참조 상태는 IIFE 지역 변수 — 값 복사가 아니라 접근자로 넘겨야 최신값이 나간다
+window.libCurRef=function(){
+  if(!libRef||!libRef.ref)return null;
+  const s2=String(libRef.ref),ci=s2.indexOf(',');
+  return{img:ci>=0?s2.slice(ci+1):s2,str:libRefStr,fid:libRefFid,style:libRefStyle,name:libRef.name};
+};
+window.libState=function(){
+  return{ref:libRef?{id:libRef.id,name:libRef.name,w:libRef.w,h:libRef.h,thumb:libRef.thumb,hasRef:!!libRef.ref}:null,
+    mode:libRefMode,str:libRefStr,fid:libRefFid,style:libRefStyle,secOpen:libSecOpen,
+    scene:JSON.parse(JSON.stringify(libScene)),delegating:libDelegating()};
+};
+window.libSetScene=function(o){
+  libScene=Object.assign({shot:'',pose:'',expr:'',bg:'',light:'',extra:''},o||{});
+  libRenderSec();refreshNaiPromptView();
+};
+
 window.naiDirectGenerate=async function(body,key){
   const seed=body.seed||(Math.floor(Math.random()*2147483646)+1);
   const payload={
@@ -4405,6 +4871,16 @@ window.naiDirectGenerate=async function(body,key){
       v4_negative_prompt:{caption:{base_caption:body.negative||NAI_WEB_DEFAULT_NEG,char_captions:[]},use_coords:false,use_order:false}
     }
   };
+  // 캐릭터 참조 (Precise Reference) — v4.5 전용, 생성당 Anlas +5
+  if(body.ref&&body.ref.img){
+    const p=payload.parameters;
+    p.director_reference_images=[body.ref.img];
+    p.director_reference_descriptions=[{use_coords:false,use_order:false,legacy_uc:false,
+      caption:{base_caption:body.ref.style?'character&style':'character',char_captions:[]}}];
+    p.director_reference_strength_values=[typeof body.ref.str==='number'?body.ref.str:1];
+    p.director_reference_secondary_strength_values=[1-(typeof body.ref.fid==='number'?body.ref.fid:1)];
+    p.director_reference_information_extracted=[1];
+  }
   const url=(NAI_LS.get('gahorok_proxy_url')||'').trim()||'https://image.novelai.net/ai/generate-image';
   const r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json','Accept':'application/x-zip-compressed'},body:JSON.stringify(payload)});
   if(!r.ok){
@@ -4419,6 +4895,7 @@ window.naiDirectGenerate=async function(body,key){
 
 // ── 세션 갤러리 ──
 let naiOutputs=[],naiGalCur=-1;
+window.naiOutputs=naiOutputs;   // 재할당 없는 배열 — 동일 참조가 유지된다
 
 // ── 생성 진행 바 (NAI는 진행률 API가 없어 부정형 바 + 경과 초) ──
 let _nprTimer=null,_nprT0=0;
@@ -4502,7 +4979,8 @@ function naiGalleryRender(){
   let h='<div class="ngal-h"><span>이번 세션 생성 '+naiOutputs.length+'장 (브라우저에만 보관 — 페이지를 닫으면 사라짐)</span>'
     +'<button class="ngal-btn pri" onclick="naiSaveOutput('+naiGalCur+')">💾 선택 저장</button>'
     +'<button class="ngal-btn" onclick="naiSaveAll()">⇩ 전체 저장</button>'
-    +'<button class="ngal-btn" onclick="paintOpen()">✏️ 편집</button></div><div class="ngal-strip">';
+    +'<button class="ngal-btn" onclick="paintOpen()">✏️ 편집</button>'
+    +'<button class="ngal-btn" onclick="libSaveFromGallery('+naiGalCur+')">📚 라이브러리</button></div><div class="ngal-strip">';
   naiOutputs.forEach((o,i)=>{
     h+='<img class="ngal-t'+(i===naiGalCur?' on':'')+(o.saved?' saved':'')+'" src="'+o.url+'" title="시드 '+o.seed+(o.saved?' · 저장됨':'')+'" onclick="naiGalShow('+i+')">';
   });
