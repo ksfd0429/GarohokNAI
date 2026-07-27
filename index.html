@@ -5854,6 +5854,7 @@ const ST={
   mode:'gen',view:'base',
   brush:72,erase:false,addOrig:true,strength:0.7,noise:0.0,
   groups:[],sel:{},free:'',
+  scroll:{},scrollY:0,pend:{},pendT:{},wide:false,ptarget:null,
   model:'nai-diffusion-4-5-full',res:'auto',steps:28,scale:5,seed:'',
   outImg:null,outUrl:'',outBlob:null,outSeed:0,
   busy:false,drawing:false,lx:0,ly:0,rafId:0
@@ -5878,6 +5879,7 @@ _sst.textContent=`
 .sd-l{width:308px;flex:0 0 308px;border-right:1px solid #23252e;background:#0e0f15;}
 .sd-c{flex:1;min-width:0;display:flex;flex-direction:column;background:#08090d;}
 .sd-r{width:330px;flex:0 0 330px;border-left:1px solid #23252e;background:#0e0f15;}
+.sd-r.wide{width:470px;flex:0 0 470px;}
 .sd-btn{background:#171922;border:1px solid #2c2f3b;color:#d8d4c8;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;font-family:inherit;}
 .sd-btn:hover{border-color:#c8a96a;color:#f0e6d2;}
 .sd-btn.pri{background:#3a2f1a;border-color:#c8a96a;color:#f0d9a8;}
@@ -5911,12 +5913,47 @@ _sst.textContent=`
 .sd-gh .sd-tw{color:#c8a96a;font-size:10px;width:12px;cursor:pointer;}
 .sd-gh .sd-tt{flex:1;font-size:11px;color:#d8d4c8;font-weight:600;cursor:pointer;}
 .sd-gh .sd-ct{font-size:9px;color:#8a8778;}
-.sd-gb{padding:7px;display:flex;flex-wrap:wrap;gap:4px;}
+.sd-gb{padding:7px;display:block;min-width:0;}
 .sd-chip{background:#0a0b10;border:1px solid #2c2f3b;border-radius:11px;padding:3px 8px;font-size:10px;color:#b6b2a6;cursor:pointer;user-select:none;}
 .sd-chip:hover{border-color:#6a6558;}
 .sd-chip.on{background:#3a2f1a;border-color:#c8a96a;color:#f0d9a8;}
 .sd-chip .sd-x{margin-left:5px;color:#4a4840;font-size:9px;}
 .sd-chip .sd-x:hover{color:#c44536;}
+/* 프리셋 슬라이드쇼 — 세로로 쌓지 않고 좌우로 흐르는 미리보기 줄 */
+.sd-gw{position:relative;min-width:0;width:100%;}
+.sd-slide{display:grid;grid-auto-flow:column;grid-auto-columns:84px;gap:5px;min-width:0;max-width:100%;
+  overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;padding:1px 1px 4px;
+  scrollbar-width:thin;scrollbar-color:#2c2f3b transparent;}
+.sd-slide::-webkit-scrollbar{height:7px;}
+.sd-slide::-webkit-scrollbar-thumb{background:#2c2f3b;border-radius:4px;}
+.sd-slide::-webkit-scrollbar-track{background:transparent;}
+.sd-pc{position:relative;background:#0a0b10;border:1px solid #2c2f3b;border-radius:6px;overflow:hidden;cursor:pointer;user-select:none;}
+.sd-pc:hover{border-color:#6a6558;}
+.sd-pc.on{border-color:#c8a96a;box-shadow:inset 0 0 0 1px #c8a96a;}
+.sd-pc .sd-pi{display:block;width:100%;height:60px;object-fit:cover;background:#000;}
+.sd-pc .sd-ph{display:flex;align-items:center;justify-content:center;height:60px;background:linear-gradient(150deg,#171922,#0d0e14);color:#4a4840;font-size:16px;}
+.sd-pc.on .sd-ph{color:#8a7448;}
+.sd-pc .sd-pl{font-size:9px;line-height:1.35;color:#b6b2a6;padding:3px 4px;height:24px;overflow:hidden;text-align:center;}
+.sd-pc.on .sd-pl{color:#f0d9a8;background:#3a2f1a;}
+.sd-pb{position:absolute;top:2px;background:rgba(8,9,13,.8);border:none;color:#9a9688;font-size:9px;line-height:1;padding:2px 3px;border-radius:4px;cursor:pointer;font-family:inherit;opacity:0;transition:opacity .12s;}
+.sd-pc:hover .sd-pb{opacity:1;}
+.sd-pb.im{left:2px;}
+.sd-pb.x{right:2px;}
+.sd-pb.im:hover{color:#c8a96a;}
+.sd-pb.x:hover{color:#c44536;}
+.sd-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;background:rgba(10,11,16,.88);border:1px solid #2c2f3b;color:#c8a96a;width:17px;height:42px;border-radius:4px;font-size:9px;cursor:pointer;padding:0;font-family:inherit;}
+.sd-nav:hover{background:#1d1a14;border-color:#c8a96a;}
+.sd-nav.l{left:-4px;}
+.sd-nav.r{right:-4px;}
+.sd-pmenu{position:fixed;z-index:1200;background:#12141c;border:1px solid #2c2f3b;border-radius:6px;padding:4px;display:none;box-shadow:0 6px 20px rgba(0,0,0,.6);}
+.sd-pmenu.on{display:block;}
+.sd-pmenu button{display:block;width:100%;text-align:left;background:none;border:none;color:#b6b2a6;font-size:10px;padding:5px 10px;cursor:pointer;font-family:inherit;border-radius:4px;white-space:nowrap;}
+.sd-pmenu button:hover{background:#1d1a14;color:#f0d9a8;}
+/* 좌측 인페인트 네비게이터 */
+.sd-navi{border:1px solid #23252e;border-radius:6px;background:#0a0b10;padding:6px;text-align:center;}
+#sd-nav{display:block;max-width:100%;margin:0 auto;border-radius:4px;background:#000;cursor:pointer;}
+.sd-nb{display:flex;justify-content:space-between;gap:6px;font-size:9px;color:#7a7668;margin-top:5px;}
+.sd-nb b{color:#c8a96a;font-weight:600;}
 .sd-mini{background:none;border:none;color:#8a8778;font-size:11px;cursor:pointer;padding:0 3px;font-family:inherit;}
 .sd-mini:hover{color:#c8a96a;}
 .sd-tag{font-size:9px;color:#7a7668;word-break:break-word;line-height:1.7;background:#0a0b10;border:1px solid #23252e;border-radius:5px;padding:6px;max-height:80px;overflow-y:auto;}
@@ -5945,7 +5982,15 @@ root.innerHTML=
     +'<div class="sd-bot" id="sd-bottom"></div>'
   +'</div>'
   +'<div class="sd-col sd-r" id="sd-right"></div>'
- +'</div>';
+ +'</div>'
+ +'<div class="sd-pmenu" id="sd-pmenu">'
+   +'<button onclick="stChipImgSet(\'out\')">현재 결과에서</button>'
+   +'<button onclick="stChipImgSet(\'base\')">원료 이미지에서</button>'
+   +'<button onclick="stChipImgSet(\'npc\')">선택 인물에서</button>'
+   +'<button onclick="stChipImgSet(\'file\')">파일…</button>'
+   +'<button onclick="stChipImgSet(\'clear\')">미리보기 지우기</button>'
+ +'</div>'
+ +'<input type="file" id="sd-pfile" accept="image/*" style="display:none;" onchange="stChipImgFile(this)">';
 document.body.appendChild(root);
 
 // ── 프리셋 열 ─────────────────────────────────────────────────────
@@ -5961,10 +6006,12 @@ function stSeed(){
     {id:stId(),title:'조명',open:false,items:stPairs(W.LIB_LIGHT)}
   ];
 }
+// 열마다 몇 줄로 흘릴지. 저장된 옛 데이터엔 rows 가 없으니 기본 2줄.
+function stRowsOf(g){const n=parseInt(g&&g.rows,10);return(n>=1&&n<=3)?n:2;}
 async function stLoadGroups(){
   try{
     const d=await libGet('presets','groups');
-    if(d&&d.groups&&d.groups.length){ST.groups=d.groups;return;}
+    if(d&&d.groups&&d.groups.length){ST.groups=d.groups;ST.wide=!!d.wide;return;}
   }catch(e){}
   ST.groups=stSeed();
   stSaveGroups();
@@ -5972,7 +6019,7 @@ async function stLoadGroups(){
 function stSaveGroups(){
   // IndexedDB 쓰기는 비동기다. 직후에 새로고침·탭 닫기가 오면 마지막 편집이 날아갈 수 있어
   // 진행 중 쓰기를 붙잡아 두고, 페이지를 떠날 때 한 번 더 밀어 넣는다.
-  try{ST.saving=libPut('presets',{id:'groups',groups:ST.groups,ts:Date.now()});}catch(e){}
+  try{ST.saving=libPut('presets',{id:'groups',groups:ST.groups,wide:!!ST.wide,ts:Date.now()});}catch(e){}
   return ST.saving;
 }
 window.stFlush=function(){return Promise.resolve(ST.saving).catch(function(){});};
@@ -6016,7 +6063,8 @@ window.stChipAdd=function(gid,ev){
   const lb=prompt('표시 이름 (한글)',String(tag).trim());
   if(lb===null)return;
   g.items.push({id:stId(),label:String(lb).trim()||String(tag).trim(),tag:String(tag).trim()});
-  g.open=true;stSaveGroups();stRight();
+  g.open=true;ST.scroll[gid]=1e7;   // 새로 넣은 칸이 보이도록 줄 끝으로
+  stSaveGroups();stRight();
 };
 window.stChipDel=function(gid,iid,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -6026,35 +6074,188 @@ window.stChipDel=function(gid,iid,ev){
   if(ST.sel[gid])ST.sel[gid]=ST.sel[gid].filter(function(x){return x!==iid;});
   stSaveGroups();stRight();stBottom();
 };
+// 선택 토글은 통째로 다시 그리지 않는다 — 가로 스크롤 위치가 튀어 슬라이드가 처음으로 되감기기 때문.
 window.stChipToggle=function(gid,iid){
   const cur=ST.sel[gid]||[];
-  ST.sel[gid]=(cur.indexOf(iid)>=0)?cur.filter(function(x){return x!==iid;}):cur.concat([iid]);
-  stRight();stBottom();
+  const on=cur.indexOf(iid)<0;
+  ST.sel[gid]=on?cur.concat([iid]):cur.filter(function(x){return x!==iid;});
+  const card=$s('sd-c-'+iid);
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(card&&g){
+    if(on)card.classList.add('on');else card.classList.remove('on');
+    const gel=card.closest('.sd-g'),ct=gel?gel.querySelector('.sd-ct'):null;
+    if(ct){const n=(ST.sel[gid]||[]).length;ct.textContent=n?(n+'/'+g.items.length):String(g.items.length);}
+  }else{
+    stRight();      // 접힌 열이라 카드가 없으면 어쩔 수 없이 전체 갱신
+  }
+  stBottom();
 };
 window.stFree=function(v){ST.free=String(v||'');stBottom();};
 
+// ── 슬라이드 조작 ─────────────────────────────────────────────────
+window.stRowsCycle=function(gid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const g=ST.groups.find(function(x){return x.id===gid;});
+  if(!g)return;
+  g.rows=stRowsOf(g)%3+1;      // 1 → 2 → 3 → 1
+  g.open=true;stSaveGroups();stRight();
+};
+window.stSlide=function(gid,dir,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const s=$s('sd-s-'+gid);if(!s)return;
+  const step=Math.max(120,Math.round(s.clientWidth*0.85));
+  const max=Math.max(0,s.scrollWidth-s.clientWidth);
+  const t=Math.max(0,Math.min(max,s.scrollLeft+dir*step));
+  s.scrollLeft=t;ST.scroll[gid]=t;
+  // 부드럽게 미끄러지는 중에 패널을 다시 그리면 중간 지점에서 얼어붙는다 — 목적지를 붙들어 둔다
+  ST.pend[gid]=t;
+  clearTimeout(ST.pendT[gid]);
+  ST.pendT[gid]=setTimeout(function(){delete ST.pend[gid];},700);
+  return t;
+};
+function stScrollSave(){
+  ST.groups.forEach(function(g){
+    const s=$s('sd-s-'+g.id);
+    if(s)ST.scroll[g.id]=(g.id in ST.pend)?ST.pend[g.id]:s.scrollLeft;
+  });
+  const r=$s('sd-right');if(r)ST.scrollY=r.scrollTop;
+}
+function stScrollRestore(){
+  ST.groups.forEach(function(g){
+    const s=$s('sd-s-'+g.id),v=ST.scroll[g.id];
+    if(!s||!v)return;
+    s.style.scrollBehavior='auto';s.scrollLeft=v;s.style.scrollBehavior='';
+    if(!(g.id in ST.pend))ST.scroll[g.id]=s.scrollLeft;   // 넘치면 브라우저가 잘라 준다
+  });
+  const r=$s('sd-right');
+  if(r&&ST.scrollY){r.scrollTop=ST.scrollY;ST.scrollY=r.scrollTop;}
+}
+window.stWide=function(){
+  ST.wide=!ST.wide;stSaveGroups();stRight();stNeedDraw();
+};
+
+// ── 카드 미리보기 이미지 ───────────────────────────────────────────
+// 프리셋은 원래 글자 태그뿐이라 눈으로 고르기 어렵다. 결과물을 그 칸에 박아 두면
+// 다음부터는 그림을 보고 고른다. 원본은 건드리지 않고 축소본만 따로 만들어 넣는다.
+async function stThumbFrom(src){
+  const im=(src&&src.tagName)?src:await libLoadImg(src);
+  const iw=im.naturalWidth||im.width,ih=im.naturalHeight||im.height;
+  const TW=168,TH=120;
+  const sc=Math.max(TW/Math.max(1,iw),TH/Math.max(1,ih));
+  const c=document.createElement('canvas');c.width=TW;c.height=TH;
+  const g=c.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,TW,TH);
+  g.drawImage(im,(TW-iw*sc)/2,(TH-ih*sc)/2,iw*sc,ih*sc);
+  return c.toDataURL('image/jpeg',0.72);
+}
+window.stThumbFrom=stThumbFrom;
+function stPMenuClose(){const m=$s('sd-pmenu');if(m)m.classList.remove('on');}
+window.stPMenuClose=stPMenuClose;
+window.stChipImg=function(gid,iid,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const m=$s('sd-pmenu');if(!m)return;
+  ST.ptarget={gid:gid,iid:iid};
+  m.classList.add('on');
+  const r=(ev&&ev.currentTarget&&ev.currentTarget.getBoundingClientRect)?ev.currentTarget.getBoundingClientRect():null;
+  const mw=m.offsetWidth||140,mh=m.offsetHeight||130;
+  const lx=r?r.left:80,by=r?r.bottom:80;
+  m.style.left=Math.max(4,Math.min(window.innerWidth-mw-4,lx-mw+24))+'px';
+  m.style.top=Math.max(4,Math.min(window.innerHeight-mh-4,by+4))+'px';
+};
+window.stChipImgSet=async function(what){
+  const t=ST.ptarget;stPMenuClose();
+  if(!t)return;
+  const g=ST.groups.find(function(x){return x.id===t.gid;});if(!g)return;
+  const it=g.items.find(function(x){return x.id===t.iid;});if(!it)return;
+  if(what==='clear'){delete it.img;ST.ptarget=null;stSaveGroups();stRight();stStatus('미리보기를 지웠습니다: '+it.label);return;}
+  if(what==='file'){const f=$s('sd-pfile');if(f)f.click();return;}   // ptarget 은 파일이 올 때까지 살려 둔다
+  let src=null;
+  if(what==='out')src=ST.outImg||ST.outUrl||null;
+  else if(what==='base')src=ST.baseImg||null;
+  else if(what==='npc')src=(ST.npc&&(ST.npc.thumb||ST.npc.ref))||null;
+  ST.ptarget=null;
+  if(!src){stStatus('쓸 이미지가 없습니다 — 먼저 결과를 만들거나 인물을 고르십시오');return;}
+  try{
+    it.img=await stThumbFrom(src);
+    stSaveGroups();stRight();stStatus('미리보기 지정: '+it.label);
+  }catch(e){stStatus('미리보기를 만들지 못했습니다: '+((e&&e.message)||e));}
+};
+window.stChipImgFile=function(inp){
+  const f=inp&&inp.files&&inp.files[0],t=ST.ptarget;
+  inp.value='';
+  if(!f||!t)return;
+  const r=new FileReader();
+  r.onload=async function(){
+    ST.ptarget=null;
+    const g=ST.groups.find(function(x){return x.id===t.gid;});if(!g)return;
+    const it=g.items.find(function(x){return x.id===t.iid;});if(!it)return;
+    try{it.img=await stThumbFrom(r.result);stSaveGroups();stRight();stStatus('미리보기 지정: '+it.label);}
+    catch(e){stStatus('미리보기를 만들지 못했습니다');}
+  };
+  r.readAsDataURL(f);
+};
+document.addEventListener('pointerdown',function(e){
+  const m=$s('sd-pmenu');
+  if(!m||!m.classList.contains('on'))return;
+  if(m.contains(e.target))return;
+  if(e.target&&e.target.closest&&e.target.closest('.sd-pb.im'))return;
+  stPMenuClose();
+},true);
+// 세로 휠을 가로 스크롤로 — 슬라이드 위에서는 줄이 옆으로 흐른다
+root.addEventListener('wheel',function(e){
+  const s=(e.target&&e.target.closest)?e.target.closest('.sd-slide'):null;
+  if(!s||s.scrollWidth<=s.clientWidth)return;
+  if(Math.abs(e.deltaY)<=Math.abs(e.deltaX))return;
+  e.preventDefault();
+  s.style.scrollBehavior='auto';s.scrollLeft+=e.deltaY;s.style.scrollBehavior='';
+  const gid=s.dataset&&s.dataset.gid;
+  if(gid){ST.scroll[gid]=s.scrollLeft;delete ST.pend[gid];clearTimeout(ST.pendT[gid]);}
+},{passive:false});
+
+function stCard(g,it,on){
+  const face=it.img
+    ?'<img class="sd-pi" src="'+it.img+'" alt="" draggable="false">'
+    :'<div class="sd-ph">'+stEsc(String(it.label||'?').replace(/\s+/g,'').slice(0,2))+'</div>';
+  return'<div class="sd-pc'+(on?' on':'')+'" id="sd-c-'+it.id+'" data-gid="'+g.id+'" data-iid="'+it.id+'"'
+    +' title="'+stEsc(it.tag)+'" onclick="stChipToggle(\''+g.id+'\',\''+it.id+'\')">'
+    +face
+    +'<div class="sd-pl">'+stEsc(it.label)+'</div>'
+    +'<button class="sd-pb im" title="미리보기 지정" onclick="stChipImg(\''+g.id+'\',\''+it.id+'\',event)">🖼</button>'
+    +'<button class="sd-pb x" title="이 칸 삭제" onclick="stChipDel(\''+g.id+'\',\''+it.id+'\',event)">✕</button>'
+    +'</div>';
+}
+
 function stRight(){
   const el=$s('sd-right');if(!el)return;
-  let h='<div class="sd-h first">프 리 셋 열</div>';
+  stScrollSave();
+  let h='<div class="sd-h first" style="display:flex;align-items:center;gap:6px;">'
+    +'<span style="flex:1;">프 리 셋 열</span>'
+    +'<button class="sd-mini" id="sd-widebtn" title="프리셋 칸 넓게 보기" onclick="stWide()">'+(ST.wide?'⇥ 좁게':'⇤ 넓게')+'</button>'
+    +'</div>';
   ST.groups.forEach(function(g){
-    const sel=ST.sel[g.id]||[];
+    const sel=ST.sel[g.id]||[],rows=stRowsOf(g);
     h+='<div class="sd-g">'
       +'<div class="sd-gh">'
         +'<span class="sd-tw" onclick="stGroupToggle(\''+g.id+'\')">'+(g.open?'▾':'▸')+'</span>'
         +'<span class="sd-tt" onclick="stGroupToggle(\''+g.id+'\')" ondblclick="stGroupRename(\''+g.id+'\',event)">'+stEsc(g.title)+'</span>'
         +'<span class="sd-ct">'+(sel.length?(sel.length+'/'+g.items.length):g.items.length)+'</span>'
-        +'<button class="sd-mini" title="칩 추가" onclick="stChipAdd(\''+g.id+'\',event)">＋</button>'
+        +'<button class="sd-mini sd-rows" title="줄 수 바꾸기 (1~3)" onclick="stRowsCycle(\''+g.id+'\',event)">▤'+rows+'</button>'
+        +'<button class="sd-mini" title="칸 추가" onclick="stChipAdd(\''+g.id+'\',event)">＋</button>'
         +'<button class="sd-mini" title="이름 변경" onclick="stGroupRename(\''+g.id+'\',event)">✎</button>'
         +'<button class="sd-mini" title="열 삭제" onclick="stGroupDel(\''+g.id+'\',event)">✕</button>'
       +'</div>';
     if(g.open){
-      h+='<div class="sd-gb">';
-      if(!g.items.length)h+='<span style="font-size:10px;color:#5a5850;">＋ 로 칩을 추가하십시오</span>';
-      g.items.forEach(function(it){
-        h+='<span class="sd-chip'+(sel.indexOf(it.id)>=0?' on':'')+'" title="'+stEsc(it.tag)+'" onclick="stChipToggle(\''+g.id+'\',\''+it.id+'\')">'
-          +stEsc(it.label)+'<span class="sd-x" onclick="stChipDel(\''+g.id+'\',\''+it.id+'\',event)">✕</span></span>';
-      });
-      h+='</div>';
+      h+='<div class="sd-gb"><div class="sd-gw">';
+      if(!g.items.length){
+        h+='<div style="font-size:10px;color:#5a5850;padding:5px 2px;">＋ 로 프리셋 칸을 추가하십시오</div>';
+      }else{
+        h+='<button class="sd-nav l" title="왼쪽" onclick="stSlide(\''+g.id+'\',-1,event)">◀</button>'
+          +'<button class="sd-nav r" title="오른쪽" onclick="stSlide(\''+g.id+'\',1,event)">▶</button>'
+          +'<div class="sd-slide" id="sd-s-'+g.id+'" data-gid="'+g.id+'" style="grid-template-rows:repeat('+rows+',auto);">';
+        g.items.forEach(function(it){h+=stCard(g,it,sel.indexOf(it.id)>=0);});
+        h+='</div>';
+      }
+      h+='</div></div>';
     }
     h+='</div>';
   });
@@ -6062,6 +6263,8 @@ function stRight(){
   h+='<div class="sd-h">자 유 태 그</div>'
     +'<textarea class="sd-in" id="sd-free" rows="3" placeholder="쉼표로 구분 · 여기 넣은 태그가 마지막에 붙습니다" oninput="stFree(this.value)">'+stEsc(ST.free)+'</textarea>';
   el.innerHTML=h;
+  if(ST.wide)el.classList.add('wide');else el.classList.remove('wide');
+  stScrollRestore();
 }
 
 function stChipTags(){
@@ -6074,10 +6277,14 @@ function stChipTags(){
 }
 
 // ── 프롬프트 조립 ──────────────────────────────────────────────────
+// 참조가 실제로 요청에 실려 나가는가 — 인페인트는 참조와 상호배타라 함께 보내지 않는다
+function stRefLive(){return !!(ST.useRef&&ST.npc&&ST.npc.ref&&ST.mode!=='infill');}
+window.stRefLive=stRefLive;
 function stPrompt(){
   const parts=[];
-  // 참조를 쓰면 인물 정체성은 이미지가 담당 → 외형 태그를 빼서 토큰을 아낀다
-  if(ST.npc&&ST.npc.idPrompt&&!(ST.useRef&&ST.npc.ref))parts.push(ST.npc.idPrompt);
+  // 참조를 쓰면 인물 정체성은 이미지가 담당 → 외형 태그를 빼서 토큰을 아낀다.
+  // 단 인페인트에서는 참조를 보내지 않으므로 외형 태그를 빼면 인물 정보가 통째로 사라진다 — 그대로 살린다.
+  if(ST.npc&&ST.npc.idPrompt&&!stRefLive())parts.push(ST.npc.idPrompt);
   stChipTags().forEach(function(t){parts.push(t);});
   if(ST.free.trim())parts.push(ST.free.trim());
   return parts.join(', ').replace(/,\s*,/g,',').trim();
@@ -6134,6 +6341,21 @@ function stMaskHas(){
 }
 window.stMaskHas=stMaskHas;
 
+// 칠한 비율과 칠한 영역의 외곽 상자를 한 번에 — 붓질 도중 매 프레임 도니 두 번 훑지 않는다
+function stMaskStat(){
+  if(!ST.maskCv)return{pct:0,box:null};
+  const w=Math.max(1,Math.min(160,ST.maskCv.width)),h=Math.max(1,Math.min(160,ST.maskCv.height));
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const g=c.getContext('2d');g.drawImage(ST.maskCv,0,0,w,h);
+  const d=g.getImageData(0,0,w,h).data;
+  let n=0,x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    if(d[(y*w+x)*4+3]>8){n++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  }
+  return{pct:n*100/(w*h),box:(x1<0)?null:{x:x0/w,y:y0/h,w:(x1-x0+1)/w,h:(y1-y0+1)/h}};
+}
+window.stMaskStat=stMaskStat;
+
 function stMaskInit(w,h){
   ST.maskCv=document.createElement('canvas');ST.maskCv.width=w;ST.maskCv.height=h;
   ST.tintCv=document.createElement('canvas');ST.tintCv.width=w;ST.tintCv.height=h;
@@ -6147,6 +6369,7 @@ function stTint(){
   g.fillRect(0,0,ST.tintCv.width,ST.tintCv.height);
   g.globalCompositeOperation='source-over';
 }
+window.stTint=stTint;
 function stSnap(){
   if(!ST.maskCv)return;
   const c=document.createElement('canvas');c.width=ST.maskCv.width;c.height=ST.maskCv.height;
@@ -6183,7 +6406,50 @@ function stNeedDraw(){
   if(ST.rafId)return;
   ST.rafId=requestAnimationFrame(function(){ST.rafId=0;stDraw();});
 }
+window.stNeedDraw=stNeedDraw;
+// ── 인페인트 네비게이터 ────────────────────────────────────────────
+// 가운데 미리보기는 크게 확대되어 화면을 넘기 일쑤라, 칠하다 보면 지금 어디를
+// 건드리는지 감각을 잃는다. 왼쪽 바둑판 아래에 원료 전체 + 칠한 자리를 작게 붙여 둔다.
+function stNavDraw(){
+  const cv=$s('sd-nav');if(!cv||!ST.baseImg)return;
+  const im=ST.baseImg;
+  const iw=im.naturalWidth||im.width,ih=im.naturalHeight||im.height;
+  const host=cv.parentNode;
+  const aw=Math.max(60,(host&&host.clientWidth)?host.clientWidth-14:180);
+  const sc=Math.min(aw/Math.max(1,iw),190/Math.max(1,ih));
+  const w=Math.max(20,Math.round(iw*sc)),h=Math.max(20,Math.round(ih*sc));
+  if(cv.width!==w)cv.width=w;
+  if(cv.height!==h)cv.height=h;
+  const g=cv.getContext('2d');
+  g.clearRect(0,0,w,h);
+  g.drawImage(im,0,0,w,h);
+  const st=stMaskStat();
+  if(ST.maskCv&&ST.tintCv&&st.pct>0){
+    g.save();g.globalAlpha=0.55;g.drawImage(ST.tintCv,0,0,w,h);g.restore();
+    if(st.box){
+      // 자잘한 붓질은 축소하면 보이지 않는다 — 칠한 범위를 점선 상자로 한 번 더 짚어 준다
+      g.save();
+      g.strokeStyle='#ff3b30';g.lineWidth=1;
+      if(g.setLineDash)g.setLineDash([3,2]);
+      g.strokeRect(Math.round(st.box.x*w)+0.5,Math.round(st.box.y*h)+0.5,
+                   Math.max(1,Math.round(st.box.w*w)-1),Math.max(1,Math.round(st.box.h*h)-1));
+      g.restore();
+    }
+  }
+  const pe=$s('sd-navpct');
+  if(pe)pe.textContent=(ST.mode==='infill')?(st.pct.toFixed(1)+'%'):'—';
+  const se=$s('sd-navstate');
+  if(se)se.textContent=(ST.mode!=='infill')?'생성 모드 · 마스크 미사용'
+    :(st.pct>0?'칠한 영역':'아직 칠하지 않음');
+}
+window.stNavDraw=stNavDraw;
+window.stNavClick=function(){
+  if(ST.view==='base'&&ST.outImg)stView('out');
+  else if(ST.view==='out')stView('base');
+};
+
 function stDraw(){
+  stNavDraw();
   const cv=$s('sd-cv'),em=$s('sd-empty'),stg=$s('sd-stage');
   if(!cv||!stg)return;
   const src=(ST.view==='out'&&ST.outImg)?ST.outImg:ST.baseImg;
@@ -6259,7 +6525,7 @@ window.stPick=async function(id){
     if(!e){stStatus('항목을 찾을 수 없습니다');return;}
     ST.npc={id:e.id,name:e.name,thumb:e.thumb,ref:e.ref,w:e.w,h:e.h,
       idPrompt:e.idPrompt||'',race:e.race||'',gender:e.gender||'',memo:e.memo||'',seed:e.seed||0};
-    stStatus('인물: '+e.name+(ST.useRef?' — 참조로 사용 중 (외형 태그 생략)':''));
+    stStatus('인물: '+e.name+(stRefLive()?' — 참조로 사용 중 (외형 태그 생략)':''));
     stLeft();stBottom();
   }catch(err){stStatus('불러오기 실패: '+((err&&err.message)||err));}
 };
@@ -6338,6 +6604,20 @@ function stLeft(keepFocus){
   });
   h+='</div>';
 
+  // 바둑판 바로 아래 — 인페인트 대상 이미지와 칠한 영역을 따로 짚어 주는 작은 창
+  h+='<div class="sd-h">네 비 게 이 터</div>';
+  if(ST.baseImg){
+    h+='<div class="sd-navi">'
+      +'<canvas id="sd-nav" width="16" height="16" title="누르면 원료 ⇄ 결과를 오갑니다" onclick="stNavClick()"></canvas>'
+      +'<div class="sd-nb"><span>'+stEsc(ST.baseName||'원료 이미지')+'</span>'
+        +'<span>'+(ST.baseImg.naturalWidth||ST.baseImg.width)+'×'+(ST.baseImg.naturalHeight||ST.baseImg.height)+'</span></div>'
+      +'<div class="sd-nb"><span id="sd-navstate">인페인트 영역</span><b id="sd-navpct">0.0%</b></div>'
+      +'</div>';
+  }else{
+    h+='<div class="sd-navi" style="font-size:9px;color:#5a5850;padding:14px 6px;line-height:1.5;">'
+      +'원료 이미지를 올리면<br>인페인트 대상과 칠한 영역이 여기 표시됩니다.</div>';
+  }
+
   if(ST.npc){
     h+='<div class="sd-h">선 택 된 인 물</div>'
       +'<div style="font-size:11px;color:#f0e6d2;">'+stEsc(ST.npc.name)+'</div>'
@@ -6347,7 +6627,9 @@ function stLeft(keepFocus){
       h+='<div class="sd-row"><label>강도</label><input type="range" min="0" max="1" step="0.05" value="'+ST.refStr+'" oninput="stSetRef(\'str\',this.value)"><span class="sd-v">'+ST.refStr.toFixed(2)+'</span></div>'
         +'<div class="sd-row"><label>정밀도</label><input type="range" min="0" max="1" step="0.05" value="'+ST.refFid+'" oninput="stSetRef(\'fid\',this.value)"><span class="sd-v">'+ST.refFid.toFixed(2)+'</span></div>'
         +'<label class="sd-row"><input type="checkbox" '+(ST.refStyle?'checked':'')+' onchange="stSetRef(\'style\',this.checked)"><span style="font-size:10px;color:#b6b2a6;">화풍까지 복사</span></label>'
-        +'<div class="sd-note">참조를 켜면 외형 태그를 프롬프트에서 뺍니다 — 토큰이 줄고 인물이 더 잘 지켜집니다.</div>';
+        +'<div class="sd-note">'+(ST.mode==='infill'
+          ?'인페인트 중에는 캐릭터 참조를 보내지 않습니다(NAI 상호배타) — 대신 외형 태그를 프롬프트에 그대로 실어 보냅니다.'
+          :'참조를 켜면 외형 태그를 프롬프트에서 뺍니다 — 토큰이 줄고 인물이 더 잘 지켜집니다.')+'</div>';
     }
   }
 
@@ -6393,6 +6675,7 @@ function stLeft(keepFocus){
     +'<div class="sd-note">레이어·블렌드·선택 영역이 필요한 정밀 수정은 캔버스 편집기에서. 내보내면 세션 갤러리로 들어옵니다.</div>';
 
   el.innerHTML=h;
+  stNavDraw();   // 패널을 통째로 다시 그리면 캔버스도 새로 생기니 즉시 채워 준다
   if(keepFocus){const q2=$s('sd-q');if(q2){q2.focus();q2.setSelectionRange(q2.value.length,q2.value.length);}}
 }
 window.stPaint=function(){
