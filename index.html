@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v14.5 + NAI</title>
+<title>가호록 v14.6 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -339,6 +339,10 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">머리 모양 — 길이 · 묶음 · 땋음 · 앞머리 (원국 자동 · 클릭 시 수동 지정)</div>
       <div id="hair-len-sel" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
+    <div style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;">
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">눈매 — 오행 기반 (천간▸지지▸일간 순 판정 · 클릭 시 수동 지정)</div>
+      <div id="eye-shape-sel" style="display:flex;gap:6px;flex-wrap:wrap;flex-direction:column;"></div>
+    </div>
     <div style="margin-top:12px;padding:10px;background:#0a0b10;border:1px solid var(--bdr);border-radius:10px;position:relative;">
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">NAI 프롬프트 (복사용)</div>
       <div id="nai-prompt" style="font-family:monospace;font-size:11px;color:var(--gold);word-break:break-all;line-height:1.6;"></div>
@@ -635,7 +639,7 @@ function generateSynopsis(d){
   sec.innerHTML=sentences.join(' ');
 }
 
-function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+d.info+'</div>';document.getElementById('cs').textContent=d.sub||'';document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
+function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+d.info+'</div>';document.getElementById('cs').textContent=d.sub||'';document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
 
 function buildTable(d){
   const rg=document.getElementById('rg'),rj=document.getElementById('rj');rg.innerHTML='';rj.innerHTML='';
@@ -2175,6 +2179,69 @@ function hairSelHtml(d){
   }).join('')+'<div style="font-size:8px;color:var(--fnt);margin-top:5px;">✦ = 원국 자동 산출값 · 클릭하면 수동 지정 (인물을 새로 뽑으면 자동으로 되돌아감)</div>';
 }
 
+// ═══ 오행 눈매(眼相) 1축 ═══
+// 목=둥근 / 화=치켜올라감 / 토=실눈 / 금=도끼눈 / 수=내려감
+// 판정: ① 천간 4자 최빈 → ② (동률 시) 지지 4자 최빈 → ③ (모두 동률 시) 일간 오행
+const EYE_SHAPES=[
+  {id:'wood', label:'둥근 눈매',       nai:'round eyes'},
+  {id:'fire', label:'치켜올라간 눈매', nai:'tsurime, upturned eyes'},
+  {id:'earth',label:'실눈',            nai:'jitome, half-closed eyes'},
+  {id:'metal',label:'도끼눈',          nai:'sharp eyes, narrow eyes, glaring'},
+  {id:'water',label:'내려간 눈매',     nai:'tareme, downturned eyes'}
+];
+// 최빈 오행 1개를 반환 · 동률(다수 미형성)이거나 표본이 없으면 null → 다음 단계로
+function eyeElemPick(list){
+  const c={};(list||[]).forEach(e=>{if(e)c[e]=(c[e]||0)+1;});
+  const ks=Object.keys(c);if(!ks.length)return null;
+  let mx=0;ks.forEach(k=>{if(c[k]>mx)mx=c[k];});
+  const top=ks.filter(k=>c[k]===mx);
+  return top.length===1?top[0]:null;
+}
+function calcEye(d){
+  if(!d||!d.p)return{id:'earth',via:'기본값'};
+  const gan=[],ji=[];
+  for(let i=0;i<4;i++){
+    const P=d.p[i];if(!P)continue;
+    const g=P.g,j=P.j;
+    if(g&&!g.lk&&g.e)gan.push(g.e);
+    if(j&&!j.lk&&j.e)ji.push(j.e);
+  }
+  let e=eyeElemPick(gan),via='① 천간 4자 최빈';
+  if(!e){e=eyeElemPick(ji);via='② 지지 4자 최빈 (천간 동률)';}
+  if(!e){const dg=d.p[1]&&d.p[1].g;e=(dg&&!dg.lk&&dg.e)||null;via='③ 일간 오행 (천간·지지 모두 동률)';}
+  if(!e){ // 원국이 통째로 미지정(???)인 퇴화 케이스 — 오행 분포로 대체
+    const el=(d&&d.el)||{};let bk=null,bv=-1;
+    ELEM_ORDER_B.forEach(k=>{if((el[k]||0)>bv){bv=el[k]||0;bk=k;}});
+    e=bk||'earth';via='오행 분포 (원국 미지정)';
+  }
+  return{id:e,via:via};
+}
+// 수동 지정 오버라이드 (null = 자동) — 새 인물 생성 시 render() 에서 초기화
+let eyeOv=null;
+function eyeOpt(id){return EYE_SHAPES.find(o=>o.id===id)||EYE_SHAPES[2];}
+function eyeSel(d){
+  const a=calcEye(d);
+  const o=eyeOpt(eyeOv||a.id);
+  return{id:o.id,label:o.label,nai:o.nai,auto:a.id,via:a.via,manual:!!eyeOv};
+}
+function setEye(id){
+  eyeOv=(id==='__auto')?null:id;
+  if(currentData)renderAppearance(currentData);
+}
+function eyeSelHtml(d){
+  const cur=eyeSel(d);
+  let h='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:4px 0;">'
+    +'<span style="font-size:9px;color:var(--dim);width:34px;flex-shrink:0;">눈매</span>';
+  h+=EYE_SHAPES.map(o=>{
+    const on=o.id===cur.id,isAu=o.id===cur.auto;
+    return '<button class="hl-btn" onclick="setEye(\''+o.id+'\')" style="padding:4px 9px;border-radius:12px;border:1px solid '+(on?'var(--gold)':'var(--bdr)')+';background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'var(--bg)':'var(--dim)')+';font-size:10px;cursor:pointer;font-weight:'+(on?'700':'400')+';">'+(EL_NAME_KR[o.id]||'')+' '+o.label+(isAu?'<span style="opacity:.75;font-size:8px;">✦</span>':'')+'</button>';
+  }).join('');
+  if(eyeOv)h+='<button onclick="setEye(\'__auto\')" title="원국 자동값으로 되돌리기" style="padding:4px 8px;border-radius:12px;border:1px dashed var(--bdr);background:transparent;color:var(--dim);font-size:10px;cursor:pointer;">↺ 자동</button>';
+  h+='</div>';
+  h+='<div style="font-size:8px;color:var(--fnt);margin-top:5px;">✦ = 원국 자동 산출값 ('+cur.via+' → '+(EL_NAME_KR[cur.auto]||'')+') · 클릭하면 수동 지정 (인물을 새로 뽑으면 자동으로 되돌아감)</div>';
+  return h;
+}
+
 // === 천간·지지 신체 modifier 테이블 (설계서 §4.4 기준) ===
 // 각 항목: [fat, muscle, height(cm), penis, breast, browThick, eyeCorner, pupilSize, pelvis]
 const STEM_BODY={
@@ -2319,7 +2386,7 @@ function _calcSinsalAppear(d){
 }
 
 function renderAppearance(d){
-  const sec=document.getElementById('appear-sec'),hlSel=document.getElementById('hair-len-sel');
+  const sec=document.getElementById('appear-sec'),hlSel=document.getElementById('hair-len-sel'),eySel=document.getElementById('eye-shape-sel');
   if(!sec)return;
   if(!d.p||!d.p[1].g.e){sec.innerHTML='<div style="text-align:center;color:var(--dim);padding:20px;font-size:11px;">원국 데이터가 부족합니다.</div>';return;}
   const _raceId=d.race==='human'?(d.ethno||'helia'):(d.race||'human');const bt=calcBodyTraits(d,_raceId);
@@ -2332,6 +2399,7 @@ function renderAppearance(d){
   const hStr=heightLabel(bt.height,gdr,_raceId);
   const browStr=bt.brow>=0.5?'굵은 눈썹':'가는 눈썹';
   const eyeCStr=bt.eyeC>=0.85?'도끼눈':bt.eyeC>=0.5?'올라간 눈꼬리':'내려간 눈꼬리';
+  const _ecur=eyeSel(d);
   const pupilStr=bt.pupil>=0.5?'큰 눈동자':'작은 눈동자';
   const gTrait=gdr==='f'?sizeLabel5(bt.breast,_raceId)+' ('+breastCup(bt.breast)+'컵)':penisLabel(bt.penis,_raceId)+' ('+penisCm(bt.penis)+'cm)';
   const sinA=_calcSinsalAppear(d);let sinH='';
@@ -2357,7 +2425,7 @@ function renderAppearance(d){
   h+=slotRowEditor(_bk,sdefs[_bk]);
   h+=slotRow(_pl('fat'),(bt.fat>=0?'+':'')+bt.fat.toFixed(2),_pk('fat'),sdefs[_pk('fat')]);
   h+=slotRow(_pl('muscle'),(bt.muscle>=0?'+':'')+bt.muscle.toFixed(2),_pk('muscle'),sdefs[_pk('muscle')]);
-  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
+  [{l:'연령대',v:_astRowV,k:'age_'+_astRow.stage},{l:_pl('height'),v:hStr,k:_pk('height')},{l:_pl('eye'),v:(EL_NAME_KR[_ecur.id]||'')+' · '+_ecur.label+(_ecur.manual?' <span style="color:var(--gold);">수동</span>':''),k:_pk('eye')},{l:_pl('eye_shape'),v:eyeCStr,k:_pk('eye_shape')},{l:_pl('pupil'),v:pupilStr,k:_pk('pupil')},{l:_pl('brow'),v:browStr,k:_pk('brow')},{l:_pl('chest'),v:gTrait,k:_pk('chest')}].concat(gdr==='f'?[{l:_pl('pelvis'),v:pelvisLabel(bt.pelvis)+' ('+Math.round(bt.pelvis)+'cm)',k:_pk('pelvis')}]:[]).concat([
     {l:_pl('butt'),v:'',k:_pk('butt')},{l:_pl('thigh'),v:'',k:_pk('thigh')},
     {l:_pl('waist'),v:'',k:_pk('waist')},{l:_pl('shoulder'),v:'',k:_pk('shoulder')},
     {l:_pl('belly'),v:'',k:_pk('belly')},{l:_pl('lips'),v:'',k:_pk('lips')},
@@ -2373,6 +2441,7 @@ function renderAppearance(d){
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
   if(hlSel)hlSel.innerHTML=hairSelHtml(d);
+  if(eySel)eySel.innerHTML=eyeSelHtml(d);
   renderNAI(d);
 }
 function renderNAI(d){
@@ -3023,6 +3092,7 @@ function naiParts(d){
   const _hb=gdr==='f'?[139,155,169,183]:[150,168,183,198];
   const hV=_hd<_hb[0]?'매우작음':_hd<_hb[1]?'작음':_hd<_hb[2]?'보통':_hd<_hb[3]?'큼':'매우큼';
   const eyeV=bt.eyeC>=0.85?'날카로움':bt.eyeC>=0.5?'올라감':'처짐';
+  const _eo=eyeSel(d);
   const puV=bt.pupil>=0.5?'큼':'작음';
   const brV=bt.brow>=0.5?'짙음':'얇음';
   const szLabel=gdr==='f'?sizeLabel5(bt.breast,raceId):penisLabel(bt.penis,raceId);
@@ -3042,7 +3112,8 @@ function naiParts(d){
     {key:'muscle@'+musG[0],label:'근육도 ['+musG[0]+']',def:musG[1]},
     {key:'age_'+_ast.stage,label:'연령대 — '+_ast.label,def:ageStageDefault(_astSp,_ast.stage)},
     {key:'height@'+hV,label:'키/체구 ['+hV+']',def:''},
-    {key:'eye_shape@'+vs(eyeV),label:'눈꼬리 ['+eyeV+']',def:bt.eyeC>=0.85?'sharp eyes, narrow eyes':bt.eyeC>=0.5?'upturned eyes':'droopy eyes, downturned eyes'},
+    {key:'eye@'+vs(_eo.label),label:'눈매 ['+_eo.label+']',def:_eo.nai},
+    {key:'eye_shape@'+vs(eyeV),label:'눈꼬리(보조) ['+eyeV+']',def:''},
     {key:'pupil@'+vs(puV),label:'눈동자 크기 ['+puV+']',def:bt.pupil>=0.5?'large eyes':'small eyes'},
     {key:'brow@'+vs(brV),label:'눈썹 ['+brV+']',def:bt.brow>=0.5?'thick eyebrows':'thin eyebrows'},
     {key:'chest@'+vs(szLabel),label:(gdr==='f'?'유방':'성기')+' ['+szLabel+']',def:gdr==='f'?sizeNaiBreast(bt.breast,raceId):sizeNaiPenis(bt.penis,raceId)}
