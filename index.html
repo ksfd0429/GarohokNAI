@@ -2198,8 +2198,8 @@ function bodyLabel(fat,muscle){
 }
 
 function heightLabel(hCm,gender,raceId){
-  // base.height는 이미 선형 매핑된 남성 기준 cm값
-  return Math.round(gender==='f'?hCm*0.85:hCm)+'cm';
+  // base.height는 남성 기준 cm — 여성은 실제 남녀 신장비(≈0.92) 적용
+  return Math.round(gender==='f'?hCm*0.92:hCm)+'cm';
 }
 
 function sizeLabel5(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
@@ -2910,7 +2910,9 @@ function naiParts(d){
   const bl=bodyLabel(bt.fat,bt.muscle);
   // ── 등급 변형 토큰: 작음/큼 등 등급이 다르면 서로 다른 프리셋으로 분리 저장 ──
   const vs=x=>String(x||'').replace(/\s+/g,'');
-  const hV=bt.height<150?'매우작음':bt.height<168?'작음':bt.height<183?'보통':bt.height<198?'큼':'매우큼';
+  const _hd=gdr==='f'?bt.height*0.92:bt.height;   // 성별 보정 표시 키
+  const _hb=gdr==='f'?[139,155,169,183]:[150,168,183,198];
+  const hV=_hd<_hb[0]?'매우작음':_hd<_hb[1]?'작음':_hd<_hb[2]?'보통':_hd<_hb[3]?'큼':'매우큼';
   const eyeV=bt.eyeC>=0.85?'날카로움':bt.eyeC>=0.5?'올라감':'처짐';
   const puV=bt.pupil>=0.5?'큼':'작음';
   const brV=bt.brow>=0.5?'짙음':'얇음';
