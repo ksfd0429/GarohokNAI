@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v14.9 + NAI</title>
+<title>가호록 v15.0 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -347,6 +347,10 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">수염 — 남성 전용 (원국 자동 · 클릭 시 수동 지정)</div>
       <div id="beard-sel" style="display:flex;gap:6px;flex-wrap:wrap;flex-direction:column;"></div>
     </div>
+    <div style="margin-top:12px;padding:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;">
+      <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">체모 — 전신 / 국부(음모) / 겨드랑이 (원국 자동 · 클릭 시 수동 지정)</div>
+      <div id="bodyhair-sel" style="display:flex;gap:6px;flex-wrap:wrap;flex-direction:column;"></div>
+    </div>
     <div style="margin-top:12px;padding:10px;background:#0a0b10;border:1px solid var(--bdr);border-radius:10px;position:relative;">
       <div style="font-size:9px;color:var(--dim);margin-bottom:6px;">NAI 프롬프트 (복사용)</div>
       <div id="nai-prompt" style="font-family:monospace;font-size:11px;color:var(--gold);word-break:break-all;line-height:1.6;"></div>
@@ -644,7 +648,7 @@ function generateSynopsis(d){
   sec.innerHTML=sentences.join(' ');
 }
 
-function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+charInfoLine(d)+'</div>';document.getElementById('cs').textContent=charSubLine(d);document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
+function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;bhOv={body:null,pubic:null,pit:null};document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+charInfoLine(d)+'</div>';document.getElementById('cs').textContent=charSubLine(d);document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
 
 function buildTable(d){
   const rg=document.getElementById('rg'),rj=document.getElementById('rj');rg.innerHTML='';rj.innerHTML='';
@@ -2442,6 +2446,98 @@ function beardSelHtml(d,bt,ast,rid){
   return h;
 }
 
+// ═══ 체모 3축 (전신 · 국부(음모) · 겨드랑이) ═══
+// 세 축이 한 덩어리로 움직이지 않도록 각각 다른 고전 근거를 주재료로 삼는다.
+//  ① 전신 : 陽盛則多毛 · 陰盛則少毛. 木火(陽·生發) 대 金水(陰·收斂)의 우열이 주재료.
+//     ※ 수염(beard)축은 火를 (−)쪽에 두는데 방향이 반대인 이유 — 수염은 "기르냐 깎냐"의
+//        단장(修飾) 축이라 火=發散·드러냄→정리 로 작용하고,
+//        체모는 생리적 밀도 축이라 火=陽氣→무성 으로 작용한다. 서로 다른 층위다.
+//  ② 국부 : 腎主前陰 · 腎藏精, 髮爲血之餘. 水(腎精)가 (+)로 뒤집혀 木(生發)과 함께 주재료가 되고
+//           金(燥·收斂)이 억제한다. 火는 미약한 陽 보조에 그친다.
+//  ③ 겨드랑이 : 手少陰心經 起於極泉(겨드랑이) · 汗爲心之液. 火가 압도적 주재료.
+// 공통 보조재 : 조후(월지 계절) · 일간 음양 · 연령대 · 체형(근육/지방) · 성별 · 종족.
+// 등급 경계는 6종족×2성별×300표본(3,600명) 실측 분포의 목표 백분위에서 역산한 값이다.
+const BHAIR_GRADES=['무모','희박','보통','짙음','무성'];
+const BHAIR_AXES=[
+  {ax:'body',ko:'전신 체모',key:'bhair_body',cut:[-0.44,0.07,0.55,1.00],
+   nai:['completely hairless body, smooth hairless skin','smooth skin, very little body hair','','body hair, hairy body','very hairy body, thick body hair, hairy chest, hairy limbs']},
+  {ax:'pubic',ko:'국부 체모(음모)',key:'bhair_pubic',cut:[-0.46,-0.10,0.24,0.50],
+   nai:['shaved pubic hair, bare pubic area','thin pubic hair, trimmed pubic hair','pubic hair','thick pubic hair, bush','very thick pubic hair, huge bush, unshaven pubic hair']},
+  {ax:'pit',ko:'겨드랑이 체모',key:'bhair_pit',cut:[-0.27,0.16,0.55,0.90],
+   nai:['shaved armpits, smooth armpits','light armpit hair','armpit hair','thick armpit hair','very thick armpit hair, unshaven armpits']}
+];
+// 종족 보정 [전신, 국부, 겨드랑이]
+const BHAIR_RACE={helia:[0,0,0],ryuan:[-0.08,-0.04,-0.06],nahar:[0.09,0.05,0.07],osela:[0.05,0.03,0.04],rugen:[0.11,0.06,0.08],elf:[-0.55,-0.30,-0.42],darkelf:[-0.45,-0.24,-0.34],dwarf:[0.50,0.28,0.38],orc:[0.38,0.22,0.30],ogre:[0.30,0.18,0.24]};
+// 조후 — 월지 계절. 巳午未 여름(+1) / 寅卯辰 봄(+0.5) / 申酉戌 가을(−0.5) / 亥子丑 겨울(−1)
+function bhairSeason(d){
+  const t=(d&&d.p&&d.p[2]&&d.p[2].j&&!d.p[2].j.lk)?d.p[2].j.tid:'';
+  if(!t)return 0;
+  if('巳午未'.indexOf(t)>=0)return 1;
+  if('寅卯辰'.indexOf(t)>=0)return 0.5;
+  if('申酉戌'.indexOf(t)>=0)return -0.5;
+  if('亥子丑'.indexOf(t)>=0)return -1;
+  return 0;
+}
+// 일간 음양 — 甲丙戊庚壬 陽(+1) / 乙丁己辛癸 陰(−1)
+function bhairDayYY(d){
+  const t=(d&&d.p&&d.p[1]&&d.p[1].g&&!d.p[1].g.lk)?d.p[1].g.tid:'';
+  if(!t)return 0;
+  return '甲丙戊庚壬'.indexOf(t)>=0?1:-1;
+}
+function bhairGrade(v,cut){return v<cut[0]?0:v<cut[1]?1:v<cut[2]?2:v<cut[3]?3:4;}
+// 원국 → 체모 3축 원점수. 각 오행 항은 엔진 실측 평균 0.20을 빼서 미리 중앙 정렬해 둔다.
+// 종족·성별·연령은 밴드를 정하고, 원국(오행·조후·음양)은 그 밴드 안에서 ±1등급을 움직인다.
+function calcBodyHair(d){
+  const rid=getAppearArchetype(d).id;
+  const bt=calcBodyTraits(d,rid);
+  const ast=calcAgeStage(d);
+  const el=(d&&d.el)||{};
+  const W=(el.wood||0)/100,F=(el.fire||0)/100,E=(el.earth||0)/100,M=(el.metal||0)/100,A=(el.water||0)/100;
+  const gf=((d&&d.gender)||'m')==='f';
+  const R=BHAIR_RACE[rid]||[0,0,0];
+  const se=bhairSeason(d),dy=bhairDayYY(d);
+  const stg=(ast&&ast.stage)||'middle';
+  const ag=stg==='youth'?-0.10:stg==='elder'?0.06:0;
+  const mus=bt?bt.muscle:0,fat=bt?bt.fat:0;
+  const rw={
+    body :((W+F)-(M+A))*1.15+(E-0.20)*0.20+se*0.10+dy*0.06+mus*0.22+ag       +R[0]+(gf?-0.38:0.16),
+    pubic:((A+W)-M-0.20)*1.05+(F-0.20)*0.25+se*0.04+dy*0.04+fat*0.14+ag*0.6  +R[1]+(gf?-0.14:0.10),
+    pit  :((F-0.20)*1.60+(W-0.20)*0.50-(M-0.20)*0.80-(A-0.20)*0.60)+se*0.12+dy*0.05+mus*0.10+ag*0.8+R[2]+(gf?-0.26:0.12)
+  };
+  const out={raw:rw};
+  BHAIR_AXES.forEach(function(Ax){out[Ax.ax]=bhairGrade(rw[Ax.ax],Ax.cut);});
+  return out;
+}
+let bhOv={body:null,pubic:null,pit:null};
+function bhairAxis(ax){return BHAIR_AXES.find(function(x){return x.ax===ax;})||BHAIR_AXES[0];}
+function bhairSel(d){
+  const a=calcBodyHair(d);
+  const o={auto:a,raw:a.raw};
+  BHAIR_AXES.forEach(function(Ax){
+    const au=a[Ax.ax],mn=bhOv[Ax.ax],i=(mn==null)?au:mn;
+    o[Ax.ax]={i:i,label:BHAIR_GRADES[i],nai:Ax.nai[i],auto:au,manual:mn!=null};
+  });
+  return o;
+}
+function setBodyHair(ax,i){
+  bhOv[ax]=(i==='__auto')?null:Number(i);
+  if(currentData)renderAppearance(currentData);
+}
+function bhairSelHtml(d){
+  const cur=bhairSel(d);
+  return BHAIR_AXES.map(function(Ax){
+    const c=cur[Ax.ax];
+    let h='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:4px 0;">'
+      +'<span style="font-size:9px;color:var(--dim);width:64px;flex-shrink:0;">'+Ax.ko+'</span>';
+    h+=BHAIR_GRADES.map(function(g,i){
+      const on=i===c.i,isAu=i===c.auto;
+      return '<button class="hl-btn" onclick="setBodyHair(\''+Ax.ax+'\','+i+')" style="padding:4px 9px;border-radius:12px;border:1px solid '+(on?'var(--gold)':'var(--bdr)')+';background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'var(--bg)':'var(--dim)')+';font-size:10px;cursor:pointer;font-weight:'+(on?'700':'400')+';">'+g+(isAu?'<span style="opacity:.75;font-size:8px;">✦</span>':'')+'</button>';
+    }).join('');
+    if(c.manual)h+='<button onclick="setBodyHair(\''+Ax.ax+'\',\'__auto\')" title="원국 자동값으로 되돌리기" style="padding:4px 8px;border-radius:12px;border:1px dashed var(--bdr);background:transparent;color:var(--dim);font-size:10px;cursor:pointer;">↺ 자동</button>';
+    return h+'</div>';
+  }).join('')+'<div style="font-size:8px;color:var(--fnt);margin-top:5px;">✦ = 원국 자동 산출값 (전신 木火↔金水 · 국부 水木↔金 · 겨드랑이 火 주재료 + 조후·일간음양·연령대·체형·종족) · 클릭하면 수동 지정</div>';
+}
+
 // ═══ 연령대 설정 UI — 종족별 실나이 구간 편집 (외형 탭 · 남녀 공통) ═══
 const AGE_CFG_SPS=['human','elf','darkelf','dwarf','orc','ogre'];
 let ageCfgSp='human';
@@ -2720,6 +2816,7 @@ function _calcSinsalAppear(d){
 function renderAppearance(d){
   const sec=document.getElementById('appear-sec'),hlSel=document.getElementById('hair-len-sel'),eySel=document.getElementById('eye-shape-sel');
   const bdSel=document.getElementById('beard-sel'),bdWrap=document.getElementById('beard-wrap');
+  const bhSel=document.getElementById('bodyhair-sel');
   if(!sec)return;
   if(!d.p||!d.p[1].g.e){sec.innerHTML='<div style="text-align:center;color:var(--dim);padding:20px;font-size:11px;">원국 데이터가 부족합니다.</div>';return;}
   const _raceId=d.race==='human'?(d.ethno||'helia'):(d.race||'human');const bt=calcBodyTraits(d,_raceId);
@@ -2774,12 +2871,19 @@ function renderAppearance(d){
     const k=_pk(A.key);
     h+=slotRow(_pl(A.key),hairOv[A.ax]?'<span style="color:var(--gold);">수동</span>':'자동',k,sdefs[k]);
   });
+  const _bhc=bhairSel(d);
+  h+=`<div style="font-size:9px;color:var(--dim);margin:12px 0 4px;letter-spacing:1px;">체모 (원국 자동 산출 · 아래에서 수동 변경 가능)</div>`;
+  BHAIR_AXES.forEach(A=>{
+    const k=_pk(A.key);
+    h+=slotRow(_pl(A.key),_bhc[A.ax].label+(_bhc[A.ax].manual?' <span style="color:var(--gold);">수동</span>':''),k,sdefs[k]);
+  });
   if(sinH)h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px;">신살 외형 보정</div>${sinH}`;
   sec.innerHTML=h;
   if(hlSel)hlSel.innerHTML=hairSelHtml(d);
   if(eySel)eySel.innerHTML=eyeSelHtml(d);
   if(bdWrap)bdWrap.style.display=(gdr==='m')?'block':'none';
   if(bdSel)bdSel.innerHTML=(gdr==='m')?beardSelHtml(d,bt,_astRow,_raceId):'';
+  if(bhSel)bhSel.innerHTML=bhairSelHtml(d);
   renderNAI(d);
 }
 function renderNAI(d){
@@ -3494,6 +3598,12 @@ function naiParts(d){
   const lmI=['매우작음','작음','보통','큼','매우큼'].indexOf(hV);
   const lmL=['짧음','짧은편','보통','긴편','매우긺'][Math.max(0,lmI)];
   parts.push({key:'limbs@'+lmL,label:'팔다리 ['+lmL+']',def:['short legs','','','long legs','very long legs, long limbs'][Math.max(0,lmI)]});
+  // 체모 3축 — 등급마다 별개 프리셋으로 저장되고, ON/OFF는 축 단위(bhair_body/bhair_pubic/bhair_pit)로 묶인다
+  const _bh=bhairSel(d);
+  BHAIR_AXES.forEach(function(Ax){
+    const c=_bh[Ax.ax];
+    parts.push({key:Ax.key+'@'+vs(c.label),label:Ax.ko+' ['+c.label+']',def:c.nai});
+  });
   return parts;
 }
 function slotVal(addr,key,def){
