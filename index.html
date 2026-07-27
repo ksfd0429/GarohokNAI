@@ -473,7 +473,7 @@ const ETHNO={
 };
 const RACE_APPEAR={
   elf:{name:'엘프',skin:'창백한 백색',skinNai:'pale white skin, ethereal',hairCol:'은백~흑색',hairColNai:'silver hair',hairType:'직모',hairTypeNai:'straight hair, silky hair',eyeCol:'녹색/호박색',eyeColNai:'green eyes',extra:'pointed ears'},
-  orc:{name:'오크',skin:'짙은 적갈색',skinNai:'dark reddish brown skin',hairCol:'흑색',hairColNai:'black hair',hairType:'밀착 곱슬/짧음',hairTypeNai:'short hair, coily hair',eyeCol:'호박/적색',eyeColNai:'amber eyes, red eyes',extra:'tusks'},
+  dragonborn:{name:'드래곤본',skin:'적동색 비늘',skinNai:'red scales, copper scales, scale skin, scales on face',hairCol:'적발~금동색',hairColNai:'red hair',hairType:'거친 직모',hairTypeNai:'straight hair, spiky hair',eyeCol:'황금/호박색',eyeColNai:'golden eyes, slit pupils',extra:'dragon horns, dragon tail, scales'},
   ogre:{name:'오거',skin:'회갈~짙은 색',skinNai:'grayish brown skin',hairCol:'흑색',hairColNai:'black hair',hairType:'곱슬',hairTypeNai:'curly hair',eyeCol:'황색/갈색',eyeColNai:'yellow eyes',extra:'large build'},
   dwarf:{name:'드워프',skin:'청동/황갈색',skinNai:'bronze skin, tan skin',hairCol:'갈색~적갈색',hairColNai:'brown hair, auburn hair',hairType:'두꺼운 웨이브',hairTypeNai:'thick wavy hair',eyeCol:'회갈색',eyeColNai:'hazel eyes',extra:'short, stocky'},
   darkelf:{name:'다크엘프',skin:'재색/어두운 회색',skinNai:'dark grey skin, ashen skin',hairCol:'백색/은색',hairColNai:'white hair, silver hair',hairType:'직모~웨이브',hairTypeNai:'straight hair',eyeCol:'보라/청색',eyeColNai:'purple eyes, violet eyes',extra:'pointed ears'}
@@ -486,7 +486,8 @@ function getAppearArchetype(d){
     const ethId=yearGanE?ELEM_TO_ETHNO[yearGanE]:'helia';
     return{type:'ethno',id:ethId,data:ETHNO[ethId]};
   }
-  return{type:'race',id:d.race,data:RACE_APPEAR[d.race]||RACE_APPEAR.elf};
+  const _rid=raceNorm(d.race);
+  return{type:'race',id:_rid,data:RACE_APPEAR[_rid]||RACE_APPEAR.elf};
 }
 
 function setMode(m){mode=m;document.getElementById('mn').className=m==='npc'?'tog-b on':'tog-b';document.getElementById('mp').className=m==='player'?'tog-b on':'tog-b';render(m==='npc'?npc:pc);}
@@ -667,7 +668,7 @@ function generateSynopsis(d){
   sec.innerHTML=sentences.join(' ');
 }
 
-function render(d){currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;bhOv={body:null,pubic:null,pit:null};document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+charInfoLine(d)+'</div>';document.getElementById('cs').textContent=charSubLine(d);document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
+function render(d){if(d&&d.race&&RACE_ALIAS[d.race])d.race=RACE_ALIAS[d.race];currentData=d;hairOv={len:null,tie:null,braid:null,bang:null};eyeOv=null;beardOv=null;bhOv={body:null,pubic:null,pit:null};document.getElementById('cn').innerHTML=d.surname?'<span style="font-size:14px;color:var(--dim);font-weight:400;">'+d.surname+'</span> <span>'+d.firstname+'</span>':(d.firstname||d.name);document.getElementById('ci').innerHTML=(d.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'')+'<div>'+charInfoLine(d)+'</div>';document.getElementById('cs').textContent=charSubLine(d);document.getElementById('cb').textContent=d.badge;var _rb=document.getElementById('cr');if(_rb){_rb.textContent=d.race?getAppearArchetype(d).data.name:'';_rb.style.display=d.race?'inline-block':'none';}generateSynopsis(d);buildTable(d);renderSupport(d);renderStats(d);renderParams(d);renderAspiration(d);renderSinsal(d);renderAppearance(d);renderAttraction(d);}
 
 function buildTable(d){
   const rg=document.getElementById('rg'),rj=document.getElementById('rj');rg.innerHTML='';rj.innerHTML='';
@@ -772,6 +773,11 @@ const SURNAMES_ELF=['에아렌딜','갈라드론','셀레보른','팔란티르',
 const RNAMES_ORC_M=['타네','마우이','랑기','라카','투이','티키','타마','하우','카후','로아','파투','마노','타우아','루페','이아토','시나','마타파','아나','투아','누우','라우','모아나','말리에토아','탄가로아','투이몰리','카이사라','네무아','파라시','레아탈리','세가','타가로아','투파이','아리키','하키','루아','타우호에','호네','아페라하마','히네마티오로','테아오','하이미오나','마카','페테로','아타와이','포우나무','나가타','카이탕가타','카이파라','타이카','와이라우','마히나','파루','카이라우','투호에','하파이','이하카','마이히','란기타네','후리아','마후타','라와타','와카','히라','포타투','테이키','레우아','카우리','코로','타오','아누','마라마','루아페후','톤가리로','피하','아오라키'];
 const RNAMES_ORC_F=['히네','모아나','아로하','마레아','티아레','타이카','마이아','타푸','루아나','와이마리리','마히나','하쿠','키아오라','푸아','파니아','카후랑기','라나','아우리','이위','타마리키','마나이아','이아마','마타리키','카와이','와이카토','후이아','라니','폴리네','타에','타오피우','나파','레아','살라','레이','알로파','니우','시마','피아','레이나','루아','아후','아올레레','히나모아나','파라이하','테아로하','루에페후','마이아로하','카후아라니','히네티타마','티아키나','마카레타','메레','라니라','파리타','위루','키리','마카우이','아후아','투이아','미리아마','히나','투카','루아히네','타마키','히네카라카','카하','마마에','코로라','마이케','와이루아','아니와','마나포우리','루카','타카히','테푸나'];
 const SURNAMES_ORC=['투이마바에가','마탈라시','스아알리이','아가가','파알레파에가','마나이아','투이일라','레가세사','타가타','말리에토아','마소에','아우바','레아탈리','투이타마','투이파우','라나와투','카이탕가타','히카오이','포타투','파엔가','라탕기','카이마나와','파라이하','투타네카이','루아타푸','와이카토','마히우타','투아토아','오로마','파랑기','마라에','아리아와','마이피','카라카','라우파라','카이레','투이아','타이나','하우마나','포카레카레','로토루아','하와이키','모투','아로타','코로티키','카이후','타이하페','코코','히네타파','마타탈라'];
+// ─── 드래곤본(火) 이름 풀 — 용언(龍言) 음운 창작 ───
+//   ※ 위의 RNAMES_ORC_* / SURNAMES_ORC (폴리네시아계)는 폐기하지 않고 원료로 보존한다.
+const RNAMES_DRGN_M=['카즈락','토르비쉬','세크아르','하즈렉','무르가쉬','발테쉬','조르악스','크라잔','나르켄','티르아쉬','고르바쉬','우즈렉','페르낙스','사르곤드','라즈미르','오크타쉬','즈발른','카르녹스','헬드락','베즈아르','투르낙','살가쉬','미르젝','노르바쉬','아즈칸','크로스악','델타쉬','파르젠','시르녹','우르가스','타즈락','렌바쉬','골드아쉬','카이렉스','브즈타르','세르하즈','마르젝스','이즈렌','하르곤','토크사르','눌바쉬','아르켄토','지르악스','페즈란','쿠르타쉬','마즈렌','볼드아쉬','세크토르','라이바쉬','오즈렉','탈가른','케르비쉬','무즈칸','드르사쉬','파즈렌','니르악','하울가쉬','자르켄','코르타스','벤즈락','이르가쉬','술드락','타르녹스','메즈아르','코즈렌','바르타쉬','훌드락','시즈렉','로르바스','아크타쉬','네르가즈','움바락'];
+const RNAMES_DRGN_F=['제사라','미르아나','칼리쉬','솔가라','베즈리스','하이라','투르네사','아즈미라','렌아라','키사엔','노르비아','파즈리스','세라흐','우즈나','타르리아','이글사','마즈엔','헤르사','조란아','실카쉬','아르네사','바즈리아','쿠엘라','니즈아라','토르비아','라흐사','메즈나','우르셀라','자이리스','핀드라','칼레나','베르사이','오즈미라','시르아나','투즈렌','하르비아','예사라흐','라즈나','케르시아','무즈엘라','비르아즈','솔레나','아즈사','타흐리아','네르바','일카사','자르네','피즈라','코르아나','룬사라','헤즈리스','마르비아','오르사흐','칼즈나','디에사','바이렌','투르아나','세즈미','노흐라','아르사이','키르베나','파르네사','우즈라','제르비아','타즈나','미즈아라'];
+const SURNAMES_DRGN=['카즈드라칸','벨모라쉬','투르하잔','오르시엔달','네크리사르','발둔가쉬','제린타올','하르모리스','실바크렌','오즈만타르','크라둔셀','베르타키움','미르잔토스','파즈크렐리온','솔가르네스','투나크림','아르젠다크','헤즈발로르','키르마둔','노르시엘라','바즈트렌돌','움가르셀','타르크비온','드라흐넨티스','세르마둔','칼리즈반','우르타크림','즈발데리온','페르그나쉬','로크산티르','마즈헬리온','벤크라둘','이르사멘토','하울그림스','자르크베른','코르텐달','투즈마리엔','실그란토스','네르바쿰','아즈텔모르','룬가르디스','베크사르멘','미르톤달','파르크셀리','오크라비온','타즈헤르돈','골드마르쉬','세크티라온','칼둔가르쉬','에즈나키움'];
 const RNAMES_OGRE_M=['에르볼','다울렌','바우르잔','누르볼','세릭볼','아이볼','서케바이','베릭','잔볼랏','알마스','사얀','아르만','누르술탄','에르난','카이랏','마르귤란','다르한','아스카르','세릭잔','바흐티야르','무라트','톨레겐','사마트','아스란','칸나트','쿠안디크','타이르','샤흐랏','올자스','아디렛','에르잔','보랏','바얀','주마바이','무카가리','사르센바이','타으바이','아베르','사부르','쿠르만','베르디벡','니슈안바이','코르잔','아르랏','케네스','딜무라트','쿠르반','트미르','다우렌','자스란','에스볼','아르잔','나우르즈바이','마르잔','아이다르','쿠바이','카이르잔','누르잔','세이텍','바으르잔','무한','아르기젝','에르텐','쿠르반알리','베켄','투르순','누르가지','토레한','에센','쿠안드','톡타르','사트볼','알텐','무르자'];
 const RNAMES_OGRE_F=['아이눌','다나라','나지라','보타구즈','아크마랄','쿤슬루','나르기즈','카미라','라우샨','마르잔','자니라','메이르구리','아이구리','누르구리','사말','디나라','알마구리','가울하르','살타나트','카를리가쉬','바기라','다무라','잔나','안젤라','굴미라','라우라','아이누라','누르잘','투르순나즈','아이게림','누르기자','비비구리','사르비나즈','바르샤구리','산쿨라쉬','알리아','쿤디즈','토르구즈','아르주안','바하르구리','살리하','에르케잔','타마라','카이르리','마이라','다르하','에르누리','잔사야','구르잔','사니야','알티나이','디나즈','누르다나','바기잔','안가','에리게','자르나즈','누르잔','살리마','아이잔','카나트구리','아르달락','톡잔','시비르','에르잔','아루아나'];
 const SURNAMES_OGRE=['오마르베코프','카르바예프','아이다르베코프','쿠르만가지예프','에르게시바예프','무라토프','투르순바예프','잔지기토프','다울렌바예프','바예샤노프','세릭바예프','누르무함베토프','이바디예프','잔볼라토프','쿠안디코프','사마토프','바얀바예프','아스카르베코프','코자바예프','칸나토프','마르귤라노프','체르노카바예프','알피야로프','토레바예프','쿠르반바예프','카시모프','누르가지예프','사으르바예프','에르텐바예프','아르지기토프','베켄바예프','타이르바예프','올자스바예프','나우르즈바예프','잔바예프','무한바예프','쿠바이바예프','사르센바예프','카이랏바예프','다르한바예프','보랏바예프','잔지코프','사르타예프','아르기지예프','에센바예프','토크타르바예프','아스란바예프','무라토프','세이텍바예프','누르볼바예프'];
@@ -821,8 +827,8 @@ const RACES={
     element:null,yearBias:0.25,monthBias:0.10},// 인간: 연간 오행→하위종족, 연지+월주 바이어스
   elf:{name:'엘프',ageRatio:0.1,minAge:180,maxAge:400,
     element:'wood',yearBias:0.35,monthBias:0.20},
-  orc:{name:'오크',ageRatio:2.0,minAge:9,maxAge:30,
-    element:'fire',yearBias:0.35,monthBias:0.20},
+  dragonborn:{name:'드래곤본',ageRatio:0.36,minAge:50,maxAge:125,
+    element:'fire',yearBias:0.35,monthBias:0.20},// 50*0.36=18.0 / 125*0.36=45.0 — 외견 앵커 유지
   ogre:{name:'오거',ageRatio:0.4,minAge:45,maxAge:150,
     element:'earth',yearBias:0.35,monthBias:0.20},
   dwarf:{name:'드워프',ageRatio:0.67,minAge:27,maxAge:65,
@@ -830,6 +836,11 @@ const RACES={
   darkelf:{name:'다크엘프',ageRatio:0.1,minAge:180,maxAge:400,
     element:'water',yearBias:0.35,monthBias:0.20}
 };
+// ═══ v18.0 종족 별칭 — 화(火) 이종족 오크 → 드래곤본 승계표 ═══
+//   원료 절대 파괴 금지: 옛 레코드를 지우지 않고 읽을 때 승계만 한다.
+//   RACES 바로 뒤에 두어야 한다 — 아래 모든 종족 조회가 이 표를 거친다.
+const RACE_ALIAS={orc:'dragonborn'};
+function raceNorm(r){return (r&&RACE_ALIAS[r])||r||'';}
 // ═══ 연령대(초년/중년/말년) 시스템 — 종족별 실나이 수명 경계 ═══
 // [초년 상한, 중년 상한] — 그 이상은 말년. 인간 하위인종(헬리아~류안)은 인간 공통.
 const AGE_STAGES={
@@ -837,7 +848,7 @@ const AGE_STAGES={
   elf:[220,550],      // 수명 ~800
   darkelf:[220,550],
   dwarf:[45,95],      // 수명 ~130
-  orc:[14,28],        // 수명 ~40 (급성장·단명)
+  dragonborn:[75,145],// 수명 ~200 (용혈 장수 — 오거 위, 엘프 아래)
   ogre:[60,130]       // 수명 ~180
 };
 const STAGE_KO={youth:'초년기',middle:'중년기',elder:'말년기'};
@@ -1082,7 +1093,7 @@ function randomNpc(){
   let race;
   if(raceRoll<0.50) race='human';
   else if(raceRoll<0.62) race='elf';
-  else if(raceRoll<0.74) race='orc';
+  else if(raceRoll<0.74) race='dragonborn';
   else if(raceRoll<0.82) race='ogre';
   else if(raceRoll<0.92) race='dwarf';
   else race='darkelf';
@@ -1100,9 +1111,9 @@ function randomNpc(){
   const saju=calcSajuFromDate(bYear,bMonth,bDay,bHour,race,true);
   const pils=saju.p;
   // Name generation (race-aware)
-  const _mPool={elf:RNAMES_ELF_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
-  const _fPool={elf:RNAMES_ELF_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
-  const _sPool={elf:SURNAMES_ELF,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
+  const _mPool={elf:RNAMES_ELF_M,dragonborn:RNAMES_DRGN_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
+  const _fPool={elf:RNAMES_ELF_F,dragonborn:RNAMES_DRGN_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
+  const _sPool={elf:SURNAMES_ELF,dragonborn:SURNAMES_DRGN,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
   const _ethnoMPool={helia:RNAMES_HELIA_M,ryuan:RNAMES_RYUAN_M,nahar:RNAMES_NAHAR_M,osela:RNAMES_OSELA_M,rugen:RNAMES_RUGEN_M};
   const _ethnoFPool={helia:RNAMES_HELIA_F,ryuan:RNAMES_RYUAN_F,nahar:RNAMES_NAHAR_F,osela:RNAMES_OSELA_F,rugen:RNAMES_RUGEN_F};
   const _ethnoSPool={helia:SURNAMES_HELIA,ryuan:SURNAMES_RYUAN,nahar:SURNAMES_NAHAR,osela:SURNAMES_OSELA,rugen:SURNAMES_RUGEN};
@@ -1931,7 +1942,7 @@ const DM_BODY_OPTS=[
 const DM_RANK_W=[3.0,2.0,1.5];   // ①②③, 이후 1.2
 function dmRankW(i){return DM_RANK_W[i]!==undefined?DM_RANK_W[i]:1.2;}
 // 설계 모달 전용 종족 수명 (말년기 상한)
-const DM_LIFESPAN={human:75,elf:800,darkelf:800,dwarf:130,orc:40,ogre:180};
+const DM_LIFESPAN={human:75,elf:800,darkelf:800,dwarf:130,dragonborn:200,ogre:180};
 // 인간 하위인종별 체형 레인지 중앙값 (년간오행→인종 파생이 체형 레인지를 바꾸는 것 보정)
 const DM_ETHNO_MID={
   2:{helia:180,rugen:185,nahar:180,osela:184,ryuan:175},   // 키 (루겐=장신 교정)
@@ -2272,9 +2283,9 @@ function dmGenerate(){
   pils.forEach(p=>{elc[p.g.e]+=12.5;elc[p.j.e]+=12.5;});
   
   const gdr=dmState.gender;
-  const _mPool={elf:RNAMES_ELF_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
-  const _fPool={elf:RNAMES_ELF_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
-  const _sPool={elf:SURNAMES_ELF,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
+  const _mPool={elf:RNAMES_ELF_M,dragonborn:RNAMES_DRGN_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
+  const _fPool={elf:RNAMES_ELF_F,dragonborn:RNAMES_DRGN_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
+  const _sPool={elf:SURNAMES_ELF,dragonborn:SURNAMES_DRGN,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
   const _ethnoMPool={helia:RNAMES_HELIA_M,rugen:RNAMES_RUGEN_M,nahar:RNAMES_NAHAR_M,osela:RNAMES_OSELA_M,ryuan:RNAMES_RYUAN_M};
   const _ethnoFPool={helia:RNAMES_HELIA_F,rugen:RNAMES_RUGEN_F,nahar:RNAMES_NAHAR_F,osela:RNAMES_OSELA_F,ryuan:RNAMES_RYUAN_F};
   const _ethnoSPool={helia:SURNAMES_HELIA,rugen:SURNAMES_RUGEN,nahar:SURNAMES_NAHAR,osela:SURNAMES_OSELA,ryuan:SURNAMES_RYUAN};
@@ -2307,9 +2318,9 @@ const HAIR_BRAIDS=[{id:'none',label:'없음',nai:''},{id:'part',label:'부분 �
 const HAIR_BANGS=[{id:'none',label:'이마 노출',nai:'forehead, no bangs, slicked back hair'},{id:'center',label:'가르마',nai:'parted bangs, center-parted hair'},{id:'side',label:'사이드뱅',nai:'swept bangs, side-swept bangs'},{id:'sheer',label:'시스루뱅',nai:'wispy bangs, see-through bangs'},{id:'blunt',label:'일자뱅',nai:'blunt bangs, straight bangs'}];
 const HAIR_AXES=[{ax:'len',ko:'길이',tab:HAIR_LENS,key:'hair_len'},{ax:'tie',ko:'묶음',tab:HAIR_TIES,key:'hair_tie'},{ax:'braid',ko:'땋음',tab:HAIR_BRAIDS,key:'hair_braid'},{ax:'bang',ko:'앞머리',tab:HAIR_BANGS,key:'hair_bang'}];
 // 종족/인종별 모발 길이 관습 보정
-const HAIR_RACE_LEN={helia:0,ryuan:0.05,nahar:0,osela:-0.05,rugen:0.05,elf:0.18,darkelf:0.15,dwarf:0.05,orc:-0.30,ogre:-0.18};
-// 종족/인종별 땋음 관습 보정 (드워프·오크 = 땋아 묶는 문화 / 오우거 = 손재주 부재)
-const HAIR_RACE_BRAID={helia:0,ryuan:0.06,nahar:0.10,osela:-0.04,rugen:0.08,elf:0.10,darkelf:0.06,dwarf:0.22,orc:0.14,ogre:-0.14};
+const HAIR_RACE_LEN={helia:0,ryuan:0.05,nahar:0,osela:-0.05,rugen:0.05,elf:0.18,darkelf:0.15,dwarf:0.05,dragonborn:0.10,ogre:-0.18};
+// 종족/인종별 땋음 관습 보정 (드워프·드래곤본 = 땋아 묶는 문화 / 오우거 = 손재주 부재)
+const HAIR_RACE_BRAID={helia:0,ryuan:0.06,nahar:0.10,osela:-0.04,rugen:0.08,elf:0.10,darkelf:0.06,dwarf:0.22,dragonborn:0.18,ogre:-0.14};
 // 원국 4지지 중 육합/삼합을 이루는 쌍의 수 (엮임 = 땋음의 재료)
 function hairHapCount(d){
   if(!d||!d.p)return 0;
@@ -2456,7 +2467,7 @@ const BEARDS=[
   {id:'full',    label:'덥수룩', nai:'full beard, thick beard, bearded'}
 ];
 // 종족/인종별 수염 관습 (엘프 계열 = 무모 / 드워프 = 수염 문화)
-const BEARD_RACE={helia:0,ryuan:-0.06,nahar:0.06,osela:0,rugen:0.08,elf:-0.45,darkelf:-0.38,dwarf:0.42,orc:0.10,ogre:0.08};
+const BEARD_RACE={helia:0,ryuan:-0.06,nahar:0.06,osela:0,rugen:0.08,elf:-0.45,darkelf:-0.38,dwarf:0.42,dragonborn:-0.30,ogre:0.08};
 function calcBeard(d,bt,ast,rid){
   if(!bt)return'none';
   const el=(d&&d.el)||{};
@@ -2513,7 +2524,7 @@ const BHAIR_AXES=[
    nai:['shaved armpits, smooth armpits','light armpit hair','armpit hair','thick armpit hair','very thick armpit hair, unshaven armpits']}
 ];
 // 종족 보정 [전신, 국부, 겨드랑이]
-const BHAIR_RACE={helia:[0,0,0],ryuan:[-0.08,-0.04,-0.06],nahar:[0.09,0.05,0.07],osela:[0.05,0.03,0.04],rugen:[0.11,0.06,0.08],elf:[-0.55,-0.30,-0.42],darkelf:[-0.45,-0.24,-0.34],dwarf:[0.50,0.28,0.38],orc:[0.38,0.22,0.30],ogre:[0.30,0.18,0.24]};
+const BHAIR_RACE={helia:[0,0,0],ryuan:[-0.08,-0.04,-0.06],nahar:[0.09,0.05,0.07],osela:[0.05,0.03,0.04],rugen:[0.11,0.06,0.08],elf:[-0.55,-0.30,-0.42],darkelf:[-0.45,-0.24,-0.34],dwarf:[0.50,0.28,0.38],dragonborn:[-0.35,-0.18,-0.26],ogre:[0.30,0.18,0.24]};
 // 조후 — 월지 계절. 巳午未 여름(+1) / 寅卯辰 봄(+0.5) / 申酉戌 가을(−0.5) / 亥子丑 겨울(−1)
 function bhairSeason(d){
   const t=(d&&d.p&&d.p[2]&&d.p[2].j&&!d.p[2].j.lk)?d.p[2].j.tid:'';
@@ -2585,7 +2596,7 @@ function bhairSelHtml(d){
 }
 
 // ═══ 연령대 설정 UI — 종족별 실나이 구간 편집 (외형 탭 · 남녀 공통) ═══
-const AGE_CFG_SPS=['human','elf','darkelf','dwarf','orc','ogre'];
+const AGE_CFG_SPS=['human','elf','darkelf','dwarf','dragonborn','ogre'];
 let ageCfgSp='human';
 function ageCfgBtnHtml(ast){
   const sp=(ast&&ast.sp)||'human',bs=ageBands(sp);
@@ -2746,14 +2757,14 @@ const STEM_WORLD={'甲':'참나무','乙':'화분','丙':'태양','丁':'등불'
 const BRANCH_WORLD={'子':'노크탄','丑':'그란디르','寅':'프레간','卯':'플로렌','辰':'레그나스','巳':'벨리스','午':'솔란','未':'큐라','申':'크리시스','酉':'스펠라','戌':'에르미탄','亥':'레바'};
 
 function calcBodyTraits(d,race){
-  const _rFB={helia:-0.05,ryuan:-0.20,nahar:0.10,osela:0.25,rugen:-0.15,elf:-0.25,orc:0.10,ogre:0.35,dwarf:0.15,darkelf:-0.10};
-  const _rMB={helia:0.05,ryuan:-0.10,nahar:-0.15,osela:0.25,rugen:0.15,elf:-0.25,orc:0.35,ogre:0.25,dwarf:0.30,darkelf:-0.20};
-  const _rPB={helia:0,ryuan:0.1,nahar:0.15,osela:-0.05,rugen:-0.2,elf:-0.6,orc:0.45,ogre:1.0,dwarf:-1.0,darkelf:0.6};
-  const _rBB={helia:0,ryuan:0,nahar:0.1,osela:0.05,rugen:-0.15,elf:-0.6,orc:-0.2,ogre:0.8,dwarf:-0.8,darkelf:0.5};
-  const _rBrB={helia:0.05,ryuan:-0.10,nahar:-0.08,osela:0.15,rugen:-0.10,elf:-0.12,orc:0.10,ogre:0.12,dwarf:0.08,darkelf:-0.08};
-  const _rEB={helia:0.05,ryuan:-0.08,nahar:-0.10,osela:-0.10,rugen:0.12,elf:-0.10,orc:0.08,ogre:-0.08,dwarf:0.08,darkelf:0.05};
-  const _rPuB={helia:0.05,ryuan:0.10,nahar:0.05,osela:-0.10,rugen:-0.08,elf:0.08,orc:-0.15,ogre:-0.10,dwarf:-0.10,darkelf:0.05};
-  const _rPlB={helia:0,ryuan:-0.05,nahar:0.05,osela:0.10,rugen:-0.05,elf:-0.15,orc:0.10,ogre:0.20,dwarf:0.15,darkelf:0};
+  const _rFB={helia:-0.05,ryuan:-0.20,nahar:0.10,osela:0.25,rugen:-0.15,elf:-0.25,dragonborn:-0.05,ogre:0.35,dwarf:0.15,darkelf:-0.10};
+  const _rMB={helia:0.05,ryuan:-0.10,nahar:-0.15,osela:0.25,rugen:0.15,elf:-0.25,dragonborn:0.30,ogre:0.25,dwarf:0.30,darkelf:-0.20};
+  const _rPB={helia:0,ryuan:0.1,nahar:0.15,osela:-0.05,rugen:-0.2,elf:-0.6,dragonborn:0.35,ogre:1.0,dwarf:-1.0,darkelf:0.6};
+  const _rBB={helia:0,ryuan:0,nahar:0.1,osela:0.05,rugen:-0.15,elf:-0.6,dragonborn:-0.05,ogre:0.8,dwarf:-0.8,darkelf:0.5};
+  const _rBrB={helia:0.05,ryuan:-0.10,nahar:-0.08,osela:0.15,rugen:-0.10,elf:-0.12,dragonborn:0.08,ogre:0.12,dwarf:0.08,darkelf:-0.08};
+  const _rEB={helia:0.05,ryuan:-0.08,nahar:-0.10,osela:-0.10,rugen:0.12,elf:-0.10,dragonborn:0.05,ogre:-0.08,dwarf:0.08,darkelf:0.05};
+  const _rPuB={helia:0.05,ryuan:0.10,nahar:0.05,osela:-0.10,rugen:-0.08,elf:0.08,dragonborn:-0.20,ogre:-0.10,dwarf:-0.10,darkelf:0.05};
+  const _rPlB={helia:0,ryuan:-0.05,nahar:0.05,osela:0.10,rugen:-0.05,elf:-0.15,dragonborn:0.10,ogre:0.20,dwarf:0.15,darkelf:0};
   const base={fat:(_rFB[race]||0)*4,muscle:(_rMB[race]||0)*4,height:0,penis:0,breast:0,brow:(0.5+(_rBrB[race]||0))*4,eyeC:(0.5+(_rEB[race]||0))*4,pupil:(0.5+(_rPuB[race]||0))*4,pelvis:0};
   if(!d||!d.p)return base;
   for(let i=0;i<4;i++){
@@ -2776,21 +2787,21 @@ function calcBodyTraits(d,race){
   // 4기둥 평균화 (8개 기여값의 합을 기둥 수로 나눔)
   base.fat/=4;base.muscle/=4;base.height/=4;
   // 종족별 키: 선형 매핑 (raw delta [-80,144] → [tMin,tMax])
-  const _rHT={helia:[172,188],ryuan:[165,185],nahar:[168,192],osela:[172,196],rugen:[175,195],elf:[187,199],orc:[170,202],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
+  const _rHT={helia:[172,188],ryuan:[165,185],nahar:[168,192],osela:[172,196],rugen:[175,195],elf:[187,199],dragonborn:[175,205],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
   const _ht=_rHT[race]||[172,188];
   base.height=_ht[0]+(base.height-(-80))/(144-(-80))*(_ht[1]-_ht[0]);
   base.penis/=4;base.breast/=4;
   base.brow/=4;base.eyeC/=4;base.pupil/=4;base.pelvis/=4;
   // 남성기: 종족별 선형 매핑 (raw [-3.2,5.6] → [tMin,tMax] cm)
-  const _rPnT={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};
+  const _rPnT={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],dragonborn:[12,32],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};
   const _pnt=_rPnT[race]||[7,27];
   base.penis=_pnt[0]+(base.penis-(-3.2))/(5.6-(-3.2))*(_pnt[1]-_pnt[0]);
   // 유방: 종족별 선형 매핑 (raw [-3.2,4.8] → [tMin,tMax] 컵인덱스)
-  const _rBrT={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};
+  const _rBrT={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],dragonborn:[1,9],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};
   const _brt=_rBrT[race]||[1,9];
   base.breast=_brt[0]+(base.breast-(-3.2))/(4.8-(-3.2))*(_brt[1]-_brt[0]);
   // 골반/하체: 선형 매핑 (raw [-0.20,0.40] → 종족별 [tMin,tMax] cm)
-  const _rPlT={helia:[83,107],ryuan:[80,104],nahar:[88,112],osela:[90,114],rugen:[84,108],elf:[78,102],orc:[86,110],ogre:[110,150],dwarf:[70,94],darkelf:[92,116]};
+  const _rPlT={helia:[83,107],ryuan:[80,104],nahar:[88,112],osela:[90,114],rugen:[84,108],elf:[78,102],dragonborn:[86,112],ogre:[110,150],dwarf:[70,94],darkelf:[92,116]};
   const _plt=_rPlT[race]||[83,107];
   base.pelvis=_plt[0]+(base.pelvis-(-0.20))/(0.40-(-0.20))*(_plt[1]-_plt[0]);
   // clamp
@@ -2837,11 +2848,11 @@ function heightLabel(hCm,gender,raceId){
   return Math.round(gender==='f'?hCm*0.92:hCm)+'cm';
 }
 
-function sizeLabel5(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
-function sizeNaiBreast(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],orc:[2,10],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'flat chest';if(t<s*2)return'small breasts';if(t<s*3)return'medium breasts';if(t<s*4)return'large breasts';return'huge breasts';}
-function sizeNaiPenis(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'micro penis';if(t<s*2)return'small penis';if(t<s*3)return'average penis';if(t<s*4)return'large penis';return'huge penis';}
+function sizeLabel5(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],dragonborn:[1,9],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
+function sizeNaiBreast(v,race){const R={helia:[1,9],ryuan:[0,8],nahar:[3,11],osela:[4,12],rugen:[2,10],elf:[1,9],dragonborn:[1,9],ogre:[9,17],dwarf:[0,8],darkelf:[3,11]};const r=R[race]||[1,9];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'flat chest';if(t<s*2)return'small breasts';if(t<s*3)return'medium breasts';if(t<s*4)return'large breasts';return'huge breasts';}
+function sizeNaiPenis(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],dragonborn:[12,32],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'micro penis';if(t<s*2)return'small penis';if(t<s*3)return'average penis';if(t<s*4)return'large penis';return'huge penis';}
 function penisCm(v){return v.toFixed(1);}
-function penisLabel(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],orc:[11,31],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
+function penisLabel(v,race){const R={helia:[7,27],ryuan:[5,25],nahar:[9,29],osela:[10,30],rugen:[8,28],elf:[6,26],dragonborn:[12,32],ogre:[20,40],dwarf:[4,24],darkelf:[12,32]};const r=R[race]||[7,27];const s=(r[1]-r[0])/5;const t=v-r[0];if(t<s)return'매우 작음';if(t<s*2)return'작음';if(t<s*3)return'보통';if(t<s*4)return'큼';return'매우 큼';}
 function breastCup(v){const cups=['AA','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q'];return cups[Math.max(0,Math.min(17,Math.round(v)))]||'E';}
 function pelvisLabel(v){if(v>=112)return'매우 큼';if(v>=100)return'큼';if(v>=90)return'보통';if(v>=80)return'작음';return'매우 작음';}
 function pelvisNai(v){if(v>=112)return'wide hips, thick thighs';if(v>=100)return'wide hips';if(v>=90)return'';if(v>=80)return'narrow hips';return'narrow hips, thin legs';}
@@ -3539,6 +3550,7 @@ async function naiLoadSlots(){
       if(j&&typeof j==='object')naiSlots={common:j.common||{},byAddr:j.byAddr||{},partsOff:j.partsOff||{},ageBands:j.ageBands||{},baseYear:(j.baseYear!=null?j.baseYear:null)};
     }catch(e){}
   }
+  if(migrateSlotsRace(naiSlots))naiSaveSlots();
   orviaYearSync();
   if(currentData){renderNAI(currentData);refreshAgeUI();}
   else if(currentData===null||currentData===undefined){/* 부팅 전 */}
@@ -3556,6 +3568,35 @@ function naiSaveSlots(){
 function naiCommon(k){const v=(naiSlots.common||{})[k];return(v!==undefined&&v!=='')?v:(NAI_COMMON_DEF[k]||'');}
 function buildTier(bt){if(bt.fat>=0.3)return'heavy';if(bt.fat<=-0.3)return'slim';if(bt.muscle>=0.3)return'broad';return'avg';}
 const TIER_KO={heavy:'거구',broad:'다부짐',slim:'마름',avg:'보통'};
+function migrateSlotsRace(o){
+  if(!o||typeof o!=='object')return false;
+  let hit=false;
+  try{
+    const ba=o.byAddr;
+    if(ba&&typeof ba==='object'){
+      Object.keys(ba).forEach(function(k){
+        const i=k.indexOf('|');if(i<0)return;
+        const head=k.slice(0,i),tail=k.slice(i);
+        const nh=RACE_ALIAS[head];if(!nh)return;
+        const nk=nh+tail;
+        if(ba[nk]===undefined){ba[nk]=ba[k];}   // 이미 있으면 신값 보존
+        delete ba[k];hit=true;
+      });
+    }
+    const ab=o.ageBands;
+    if(ab&&typeof ab==='object'){
+      Object.keys(ab).forEach(function(k){
+        const nk=RACE_ALIAS[k];if(!nk)return;
+        if(ab[nk]===undefined&&ab[k]){
+          try{ab[nk]=ageBandsSanitize(nk,ab[k],true);}catch(e){ab[nk]=ab[k];}
+        }
+        delete ab[k];hit=true;
+      });
+    }
+  }catch(e){}
+  return hit;
+}
+window.raceNorm=raceNorm;window.migrateSlotsRace=migrateSlotsRace;
 function slotAddr(d){
   const arch=getAppearArchetype(d);
   const raceId=arch.id;
@@ -4207,7 +4248,7 @@ async function runCompat(d,gdr,gen){
       {k:'val',rk:'rv',icon:'🧭',name:'지향·성격 궁합'},
       {k:'total',rk:null,icon:'💍',name:'종합 궁합'}
     ];
-    const raceOpts=[['human','인간'],['elf','엘프'],['darkelf','다크엘프'],['orc','오크'],['ogre','오거'],['dwarf','드워프']];
+    const raceOpts=[['human','인간'],['elf','엘프'],['darkelf','다크엘프'],['dragonborn','드래곤본'],['ogre','오거'],['dwarf','드워프']];
     const stageOpts=[['any','전체 연령'],['youth','초년기'],['middle','중년기'],['elder','말년기']];
     const stageNote=stg==='any'?'':' · '+({youth:'초년기',middle:'중년기',elder:'말년기'})[stg];
     let h=`<div class="xm-card"><div class="xm-tit">궁 합 시 뮬 레 이 션</div>
@@ -4242,7 +4283,7 @@ async function runCompat(d,gdr,gen){
 window.csSpawn=function(idx){
   const c=csCands.find(x=>x.idx===idx);if(!c)return;
   const gdr=c.cd.gender;
-  const race=c.race||'human';
+  const race=raceNorm(c.race)||'human';
   let eth=null,raceName,fn,sn='';
   if(race==='human'){
     eth=ELEM_TO_ETHNO[c.saju.p[3].g.e]||'helia';
@@ -4252,9 +4293,9 @@ window.csSpawn=function(idx){
     fn=pick(gdr==='m'?MP[eth]:FP[eth]);sn=Math.random()<0.65?pick(SP[eth]):'';
     raceName=(ETHNO[eth]||{name:'인간'}).name;
   }else{
-    const MP={elf:RNAMES_ELF_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
-    const FP={elf:RNAMES_ELF_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
-    const SP={elf:SURNAMES_ELF,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
+    const MP={elf:RNAMES_ELF_M,dragonborn:RNAMES_DRGN_M,orc:RNAMES_ORC_M,ogre:RNAMES_OGRE_M,dwarf:RNAMES_DWARF_M,darkelf:RNAMES_DELF_M};
+    const FP={elf:RNAMES_ELF_F,dragonborn:RNAMES_DRGN_F,orc:RNAMES_ORC_F,ogre:RNAMES_OGRE_F,dwarf:RNAMES_DWARF_F,darkelf:RNAMES_DELF_F};
+    const SP={elf:SURNAMES_ELF,dragonborn:SURNAMES_DRGN,orc:SURNAMES_ORC,ogre:SURNAMES_OGRE,dwarf:SURNAMES_DWARF,darkelf:SURNAMES_DELF};
     fn=pick(gdr==='m'?(MP[race]||RNAMES_M):(FP[race]||RNAMES_F));sn=Math.random()<0.65?pick(SP[race]||SURNAMES):'';
     raceName=(RACES[race]||{}).name||race;
   }
@@ -4456,10 +4497,15 @@ function libOpen(){
 function _libOS(store,mode){return libOpen().then(function(db){return db.transaction(store,mode).objectStore(store);});}
 function _libReq(r){return new Promise(function(res,rej){r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
 function libPut(store,obj){return _libOS(store,'readwrite').then(function(os){return _libReq(os.put(obj)).then(function(){return obj;});});}
-function libAll(store){return _libOS(store,'readonly').then(function(os){return _libReq(os.getAll()).then(function(a){return a||[];});});}
-function libGet(store,id){return _libOS(store,'readonly').then(function(os){return _libReq(os.get(id));});}
+function _libNormRace(o){if(o&&o.race&&RACE_ALIAS[o.race])o.race=RACE_ALIAS[o.race];return o;}
+function libAll(store){return _libOS(store,'readonly').then(function(os){return _libReq(os.getAll()).then(function(a){return (a||[]).map(_libNormRace);});});}
+function libGet(store,id){return _libOS(store,'readonly').then(function(os){return _libReq(os.get(id)).then(_libNormRace);});}
 function libDel(store,id){return _libOS(store,'readwrite').then(function(os){return _libReq(os.delete(id));});}
-function libId(){return 'c'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);}
+let _libIdSeq=0;
+// v18.2 — 같은 밀리초 재호출(libImport 루프)에서의 키 충돌 방지.
+//   ms 가 같으면 단조 카운터가, 다르면 타임스탬프가 유일성을 보장한다.
+//   난수부는 2자리 고정 폭이라 '카운터+난수' 경계가 모호해지지 않는다.
+function libId(){return 'c'+Date.now().toString(36)+'-'+(_libIdSeq++).toString(36)+('0'+Math.floor(Math.random()*1296).toString(36)).slice(-2);}
 
 // ── 이미지 유틸 (참조 캔버스 레터박스 + 썸네일) ──
 function libPickCanvas(w,h){
@@ -4762,7 +4808,7 @@ async function drawLibModal(keepFocus){
   el.innerHTML=h;
   if(keepFocus){const q2=document.getElementById('lib-q');if(q2){q2.focus();q2.setSelectionRange(q2.value.length,q2.value.length);}}
 }
-function libRaceKo(r){return (r&&RACES[r]&&RACES[r].name)||r||'';}
+function libRaceKo(r){r=raceNorm(r);return (r&&RACES[r]&&RACES[r].name)||r||'';}
 
 // ── 외형 탭 섹션 렌더 ──
 function libSelHtml(id,list,cur,key){
@@ -5190,6 +5236,7 @@ window.nsApplySettings=function(j){
   else return '알 수 없는 형식 — gahorok_settings.json 또는 slots.json이어야 함';
   if(slots&&typeof slots==='object'){
     naiSlots={common:slots.common||{},byAddr:slots.byAddr||{},partsOff:slots.partsOff||{},ageBands:slots.ageBands||{},baseYear:(slots.baseYear!=null?slots.baseYear:null)};
+    migrateSlotsRace(naiSlots);
     orviaYearSync();
     clearTimeout(naiSlotsSaveTimer);   // 가져오기는 디바운스 없이 즉시 저장 (직후 이탈 시 유실 방지)
     if(NAI_SERVER_MODE){fetch('/slots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(naiSlots)}).catch(()=>{});}
