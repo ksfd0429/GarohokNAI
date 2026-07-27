@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v15.0 + NAI</title>
+<title>가호록 v15.1 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -856,7 +856,34 @@ function ageBandsSanitize(sp,arr,keepOrder){
 // 배열이 오름차순인지 (수동 배열에서 경고 표시용 — 고쳐주지는 않는다)
 function ageBandsAscending(bs){for(let i=1;i<bs.length;i++)if(bs[i].from<=bs[i-1].from)return false;return true;}
 function ageBandsCustom(sp){try{return(naiSlots&&naiSlots.ageBands&&naiSlots.ageBands[sp]&&naiSlots.ageBands[sp].length)?naiSlots.ageBands[sp]:null;}catch(e){return null;}}
-function ageBands(sp){const c=ageBandsCustom(sp);return c?ageBandsSanitize(sp,c,true):ageBandsDefault(sp);}
+// ═══ 시작 나이 자동 산출 (v15.1 — 구간별 시작 나이 수동 설정 폐지) ═══
+//   기준점(knots) = [성인하한, AGE_STAGES[0], AGE_STAGES[1], 수명] 을 t=0,1/3,2/3,1 에 놓고
+//   N구간이면 i번 구간을 t=i/N 에서 선형보간한다 → N=3 이면 기존 기본값과 정확히 일치한다.
+//   ※ 저장된 raw from 값은 지우지 않는다 (원료 절대 파괴 금지) — 읽을 때만 자동값을 입힌다.
+function ageBandLifespan(sp){return (typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[sp])||(RACES[sp]&&RACES[sp].maxAge)||75;}
+function ageBandKnots(sp){
+  const bd=AGE_STAGES[sp]||AGE_STAGES.human,k=[ageAdultFloor(sp),bd[0],bd[1],ageBandLifespan(sp)];
+  for(let i=1;i<k.length;i++)if(!(k[i]>k[i-1]))k[i]=k[i-1]+1;   // 단조 방어
+  return k;
+}
+function ageBandAutoFrom(sp,n,i){
+  const k=ageBandKnots(sp);
+  if(!(i>0)||!(n>1))return k[0];
+  const t=Math.min(1,i/n)*3,a=Math.min(2,Math.floor(t));
+  return Math.round(k[a]+(k[a+1]-k[a])*(t-a));
+}
+function ageBandsAuto(sp,bs){
+  let prev=-Infinity;
+  return bs.map(function(b,i){
+    let fr=ageBandAutoFrom(sp,bs.length,i);
+    if(fr<=prev)fr=prev+1;                                       // 단조 보장
+    prev=fr;
+    return{id:b.id,label:b.label,from:fr,from0:b.from};          // from0 = 저장 원본 (보존)
+  });
+}
+// 저장 원본 (편집·보존용) — 자동 시작나이를 입히기 전 상태
+function ageBandsRaw(sp){const c=ageBandsCustom(sp);return c?ageBandsSanitize(sp,c,true):ageBandsDefault(sp);}
+function ageBands(sp){return ageBandsAuto(sp,ageBandsRaw(sp));}
 // 구간 범위는 "배열 순서" 그대로 읽는다 — i번 구간은 i+1번 구간의 시작 직전까지, 마지막은 개방
 function ageBandRange(bs,i){return{from:bs[i].from,to:(i+1<bs.length?bs[i+1].from-1:null)};}
 function ageBandOf(sp,age){
@@ -2558,7 +2585,7 @@ function ageCfgBtnHtml(ast){
 function openAgeCfg(sp){ageCfgSp=(sp&&AGE_CFG_SPS.indexOf(sp)>=0)?sp:'human';drawAgeCfg();}
 function closeAgeCfg(){const el=document.getElementById('agecfg-modal');if(el)el.innerHTML='';}
 function ageCfgPick(sp){ageCfgSp=sp;drawAgeCfg();}
-function ageCfgCopy(){return ageBands(ageCfgSp).map(function(b){return{id:b.id,label:b.label,from:b.from};});}
+function ageCfgCopy(){return ageBandsRaw(ageCfgSp).map(function(b){return{id:b.id,label:b.label,from:b.from};});}
 function ageCfgSet(a){
   naiSlots.ageBands=naiSlots.ageBands||{};
   // keepOrder — 사용자가 짠 순서를 자동으로 바꾸지 않는다
@@ -2592,7 +2619,6 @@ function agePinSet(v){
   if(ci&&currentData.ageInInfo){const nm=currentData.surname?'<div class="name-labels"><span style="color:var(--dim);">성 ↑</span><span style="color:var(--txt);opacity:.5;">이름 ↑</span></div>':'';ci.innerHTML=nm+'<div>'+charInfoLine(currentData)+'</div>';}
 }
 function ageCfgLabel(i,v){const a=ageCfgCopy();if(!a[i])return;a[i].label=v;ageCfgSet(a);}
-function ageCfgFrom(i,v){const a=ageCfgCopy();if(!a[i])return;const n=parseInt(v,10);if(!isFinite(n))return;a[i].from=n;ageCfgSet(a);}
 function ageCfgAdd(){
   const a=ageCfgCopy(),R=RACES[ageCfgSp]||RACES.human;
   const life=(typeof DM_LIFESPAN!=='undefined'&&DM_LIFESPAN[ageCfgSp])||R.maxAge||75;
@@ -2616,7 +2642,7 @@ function drawAgeCfg(){
   let h='<div class="modal-overlay" onclick="if(event.target===this)closeAgeCfg()"><div class="modal-box" style="max-width:400px;">'
     +'<button class="modal-close" onclick="closeAgeCfg()">✕</button>'
     +'<div class="modal-title">연 령 대 설 정</div>'
-    +'<div class="modal-sub">종족별 실나이 구간 · 남녀 공통 — 구간 1개당 남/여 프리셋 2칸</div>';
+    +'<div class="modal-sub">종족별 실나이 구간 · 남녀 공통 — 구간 1개당 남/여 프리셋 2칸 · 시작 나이 자동</div>';
   // ── 글로벌: 기준 연도 ──
   h+='<div id="agecfg-global" style="border:1px solid var(--bdr2);border-radius:8px;padding:8px 9px;margin-bottom:11px;background:rgba(212,168,67,.04);">'
     +'<div style="display:flex;align-items:center;gap:6px;">'
@@ -2637,8 +2663,8 @@ function drawAgeCfg(){
     }).join('')+'</div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">'
     +'<span style="font-size:9px;color:var(--gold);font-weight:700;">'+(((RACES[sp]||{}).name)||sp)+' 연령 구간 · 수동 배열</span>'
-    +'<span style="font-size:8px;color:'+(ageBandsAscending(bs)?'var(--fnt)':'#c46')+';">'+(ageBandsAscending(bs)?'▲▼ 로 순서를 직접 옮깁니다':'⚠ 시작 나이가 오름차순이 아닙니다 (배열 그대로 적용됨)')+'</span></div>';
-  h+='<table class="modal-tbl" id="agecfg-tbl"><tr><th style="width:26px;"></th><th style="width:84px;">구간 이름</th><th style="width:60px;">시작 나이</th><th>구간 · 프리셋 키</th><th style="width:16px;"></th></tr>';
+    +'<span style="font-size:8px;color:var(--fnt);">▲▼ 로 순서를 직접 옮깁니다 · 나이 구간은 자동</span></div>';
+  h+='<table class="modal-tbl" id="agecfg-tbl"><tr><th style="width:26px;"></th><th style="width:104px;">구간 이름</th><th>나이 구간 (자동) · 프리셋 키</th><th style="width:16px;"></th></tr>';
   bs.forEach(function(b,i){
     const to=(i+1<bs.length)?bs[i+1].from-1:null;
     const cur=(b.id===curId);
@@ -2648,10 +2674,7 @@ function drawAgeCfg(){
       +'<button class="agecfg-dn" data-i="'+i+'" onclick="ageCfgMove('+i+',1)" title="아래로" '+(i===bs.length-1?'disabled':'')+' style="background:none;border:none;color:'+(i===bs.length-1?'var(--bdr)':'var(--dim)')+';font-size:9px;cursor:'+(i===bs.length-1?'default':'pointer')+';padding:0 1px;display:block;line-height:1.1;">▼</button>'
       +'</td>'
       +'<td><input class="agecfg-lb" data-i="'+i+'" value="'+esc(b.label)+'" onchange="ageCfgLabel('+i+',this.value)" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:10px;padding:3px 5px;"></td>'
-      +'<td>'+(i===0
-        ? '<span style="font-size:10px;color:var(--dim);">'+fl+'<span style="font-size:8px;"> 고정</span></span>'
-        : '<input class="agecfg-fr" data-i="'+i+'" type="number" min="'+(fl+1)+'" step="1" value="'+b.from+'" onchange="ageCfgFrom('+i+',this.value)" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:5px;font-size:10px;padding:3px 5px;">')+'</td>'
-      +'<td class="ss-ex"><span style="color:var(--txt);">'+ageRangeKo(b.from,to)+'</span>'+(cur?' <span style="color:var(--gold);">◀ 현재</span>':'')+apx(b.from)
+      +'<td class="ss-ex"><span style="color:var(--txt);">'+ageRangeKo(b.from,to)+'</span>'+(i===0?'<span style="font-size:8px;color:var(--fnt);"> 성인 하한 '+fl+'세 고정</span>':'')+(cur?' <span style="color:var(--gold);">◀ 현재</span>':'')+apx(b.from)
       +'<div style="color:var(--fnt);font-size:8px;">age_'+b.id+'_m · age_'+b.id+'_f</div></td>'
       +'<td>'+(bs.length>1?'<button class="agecfg-del" data-i="'+i+'" onclick="ageCfgDel('+i+')" title="구간 삭제" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;padding:0 2px;">✕</button>':'')+'</td></tr>';
   });
@@ -2665,6 +2688,7 @@ function drawAgeCfg(){
     +'· 구간을 지워도 적어둔 프롬프트 텍스트는 지우지 않습니다 — 같은 구간을 다시 만들면 그대로 돌아옵니다.<br>'
     +'· 남녀 공통 구간이지만 프리셋은 남/여로 나뉩니다. 성별 구분은 프리셋 쪽에서 하세요.<br>'
     +'· 구간 순서는 ▲▼로 직접 배열합니다 — 자동 정렬하지 않습니다. i번 구간은 다음 구간 시작 직전까지가 범위입니다.<br>'
+    +'· 시작 나이는 손으로 정하지 않습니다 — 구간 개수와 배열 위치에 따라 자동으로 잡힙니다. 구간을 늘리면 전체가 다시 나뉩니다.<br>'
     +'· 첫 구간 하한은 성인 기준(외견 18세 = '+((RACES[sp]||{}).name||'인간')+' 실나이 '+fl+'세)으로 고정됩니다.<br>'
     +'· 참고: '+((RACES[sp]||{}).name||'인간')+' 수명 '+life+'세 · 외견 나이 비율 ×'+ar+'</div>';
   h+='</div></div>';
