@@ -323,7 +323,7 @@ textarea.nai-in:focus{border-color:var(--gold);overflow-y:auto;box-shadow:0 0 6p
   <span class="nav-title">가 호 록</span>
   <div style="display:flex;gap:8px;">
     <button class="nav-btn" id="nav-studio" style="display:none;" onclick="stOpen()" title="스튜디오 — 라이브러리 NPC · 원료 이미지 · 인페인트 · 프리셋">🎬 스튜디오</button>
-    <a class="nav-btn" href="RMMZStudio.html" title="RMMZ Studio로 돌아가기">Studio</a>
+    <a class="nav-btn" id="nav-rmmz" href="RMMZStudio.html" title="RMMZ Studio로 돌아가기">Studio</a>
     <button class="nav-btn" onclick="location.reload()" title="새로고침">새로고침</button>
   </div>
 </div>
@@ -6597,6 +6597,10 @@ window.stState=function(){
 // 상단 버튼 노출 + 초기 라우팅
 const navb=document.getElementById('nav-studio');
 if(navb)navb.style.display='';
+// 웹 배포판에는 RMMZStudio.html 이 없다 — 죽은 링크이자 이름이 겹쳐 혼동을 준다.
+// 서버 모드에서는 이 블록 자체가 실행되지 않으므로 기존 링크는 그대로 남는다.
+const navr=document.getElementById('nav-rmmz');
+if(navr)navr.style.display='none';
 if(location.hash==='#studio')setTimeout(function(){stOpen();},0);
 })();
 
