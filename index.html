@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>가호록 v18.2 + NAI</title>
+<title>가호록 v18.3 + NAI</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -2787,7 +2787,7 @@ function calcBodyTraits(d,race){
   // 4기둥 평균화 (8개 기여값의 합을 기둥 수로 나눔)
   base.fat/=4;base.muscle/=4;base.height/=4;
   // 종족별 키: 선형 매핑 (raw delta [-80,144] → [tMin,tMax])
-  const _rHT={helia:[172,188],ryuan:[165,185],nahar:[168,192],osela:[172,196],rugen:[175,195],elf:[187,199],dragonborn:[175,205],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
+  const _rHT={helia:[172,188],ryuan:[165,185],nahar:[168,192],osela:[172,196],rugen:[175,195],elf:[187,199],dragonborn:[166,190],ogre:[200,300],dwarf:[125,145],darkelf:[180,200]};
   const _ht=_rHT[race]||[172,188];
   base.height=_ht[0]+(base.height-(-80))/(144-(-80))*(_ht[1]-_ht[0]);
   base.penis/=4;base.breast/=4;
